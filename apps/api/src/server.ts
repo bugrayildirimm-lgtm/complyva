@@ -7,10 +7,11 @@ import { mkdir, writeFile, readFile } from "fs/promises";
 import { join } from "path";
 
 const app = Fastify({ logger: true });
-app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } }); // 20MB max
+app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
 
 const UPLOAD_DIR = join(process.cwd(), "uploads");
 mkdir(UPLOAD_DIR, { recursive: true }).catch(() => {});
+
 function cleanBody(body: any) {
   if (!body || typeof body !== "object") return body;
   const cleaned = { ...body };
@@ -33,7 +34,11 @@ app.get("/", async () => ({
     "/risks (GET, POST)",
     "/audits (GET, POST)",
     "/findings (POST)",
-    "/audits/:id/findings (GET)"
+    "/audits/:id/findings (GET)",
+    "/evidence/upload (POST)",
+    "/evidence/:entityType/:entityId (GET)",
+    "/evidence/download/:fileId (GET)",
+    "/evidence/:fileId (DELETE)"
   ]
 }));
 
@@ -357,8 +362,6 @@ app.post("/auth/sync", async (req) => {
 // =======================
 // Evidence Files
 // =======================
-
-// Upload a file
 app.post("/evidence/upload", async (req) => {
   const { orgId, userId, role } = getAuth(req);
   if (role === "VIEWER") throw new Error("Forbidden");
@@ -366,8 +369,8 @@ app.post("/evidence/upload", async (req) => {
   const data = await req.file();
   if (!data) throw new Error("No file uploaded");
 
-  const entityType = String(data.fields?.entityType?.value ?? "");
-  const entityId = String(data.fields?.entityId?.value ?? "");
+  const entityType = String((data.fields?.entityType as any)?.value ?? "");
+  const entityId = String((data.fields?.entityId as any)?.value ?? "");
 
   if (!["CERTIFICATION", "RISK", "AUDIT", "FINDING"].includes(entityType)) {
     throw new Error("Invalid entity type");
@@ -379,15 +382,12 @@ app.post("/evidence/upload", async (req) => {
   const mimeType = data.mimetype;
   const fileSize = buffer.length;
 
-  // Create a unique storage key
   const storageKey = `${orgId}/${entityType}/${entityId}/${Date.now()}-${fileName}`;
   const filePath = join(UPLOAD_DIR, storageKey);
 
-  // Create directories and save file
   await mkdir(join(UPLOAD_DIR, orgId, entityType, entityId), { recursive: true });
   await writeFile(filePath, buffer);
 
-  // Save record to database
   const r = await pool.query(
     `INSERT INTO evidence_files
       (org_id, entity_type, entity_id, file_name, mime_type, file_size, s3_key, uploaded_by)
@@ -399,7 +399,6 @@ app.post("/evidence/upload", async (req) => {
   return r.rows[0];
 });
 
-// List files for an entity
 app.get("/evidence/:entityType/:entityId", async (req) => {
   const { orgId } = getAuth(req);
   const { entityType, entityId } = req.params as { entityType: string; entityId: string };
@@ -415,7 +414,6 @@ app.get("/evidence/:entityType/:entityId", async (req) => {
   return r.rows;
 });
 
-// Download a file
 app.get("/evidence/download/:fileId", async (req, reply) => {
   const { orgId } = getAuth(req);
   const { fileId } = req.params as { fileId: string };
@@ -437,7 +435,6 @@ app.get("/evidence/download/:fileId", async (req, reply) => {
     .send(buffer);
 });
 
-// Delete a file
 app.delete("/evidence/:fileId", async (req) => {
   const { orgId, role } = getAuth(req);
   if (role === "VIEWER") throw new Error("Forbidden");
@@ -452,11 +449,8 @@ app.delete("/evidence/:fileId", async (req) => {
   if (r.rows.length === 0) throw new Error("File not found");
   return { deleted: true };
 });
-```
 
-Also add `uploads/` to your `.gitignore` so uploaded files don't get pushed to GitHub. Open your `.gitignore` and add:
-```
-uploads/
+// --- Error handler ---
 app.setErrorHandler((err, _req, reply) => {
   const msg = err instanceof Error ? err.message : "Unknown error";
   reply.status(400).send({ error: msg });
@@ -470,3 +464,8 @@ app.listen({ port, host: "0.0.0.0" })
     app.log.error(err);
     process.exit(1);
   });
+```
+
+Also add `uploads/` to your `.gitignore` file (the `.gitignore` in your project root, not `server.ts`). Just add this line at the end:
+```
+uploads/
