@@ -2,9 +2,15 @@ import Fastify from "fastify";
 import { z } from "zod";
 import { pool } from "./db";
 import { getAuth } from "./auth";
+import multipart from "@fastify/multipart";
+import { mkdir, writeFile, readFile } from "fs/promises";
+import { join } from "path";
 
 const app = Fastify({ logger: true });
+app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } }); // 20MB max
 
+const UPLOAD_DIR = join(process.cwd(), "uploads");
+mkdir(UPLOAD_DIR, { recursive: true }).catch(() => {});
 function cleanBody(body: any) {
   if (!body || typeof body !== "object") return body;
   const cleaned = { ...body };
@@ -348,7 +354,109 @@ app.post("/auth/sync", async (req) => {
   return { userId, orgId, role: "ADMIN" };
 });
 
-// --- Error handler (nice JSON errors) ---
+// =======================
+// Evidence Files
+// =======================
+
+// Upload a file
+app.post("/evidence/upload", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+
+  const data = await req.file();
+  if (!data) throw new Error("No file uploaded");
+
+  const entityType = String(data.fields?.entityType?.value ?? "");
+  const entityId = String(data.fields?.entityId?.value ?? "");
+
+  if (!["CERTIFICATION", "RISK", "AUDIT", "FINDING"].includes(entityType)) {
+    throw new Error("Invalid entity type");
+  }
+  if (!entityId) throw new Error("Missing entity ID");
+
+  const buffer = await data.toBuffer();
+  const fileName = data.filename;
+  const mimeType = data.mimetype;
+  const fileSize = buffer.length;
+
+  // Create a unique storage key
+  const storageKey = `${orgId}/${entityType}/${entityId}/${Date.now()}-${fileName}`;
+  const filePath = join(UPLOAD_DIR, storageKey);
+
+  // Create directories and save file
+  await mkdir(join(UPLOAD_DIR, orgId, entityType, entityId), { recursive: true });
+  await writeFile(filePath, buffer);
+
+  // Save record to database
+  const r = await pool.query(
+    `INSERT INTO evidence_files
+      (org_id, entity_type, entity_id, file_name, mime_type, file_size, s3_key, uploaded_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+     RETURNING *`,
+    [orgId, entityType, entityId, fileName, mimeType, fileSize, storageKey, userId]
+  );
+
+  return r.rows[0];
+});
+
+// List files for an entity
+app.get("/evidence/:entityType/:entityId", async (req) => {
+  const { orgId } = getAuth(req);
+  const { entityType, entityId } = req.params as { entityType: string; entityId: string };
+
+  const r = await pool.query(
+    `SELECT id, file_name, mime_type, file_size, uploaded_at
+     FROM evidence_files
+     WHERE org_id = $1 AND entity_type = $2 AND entity_id = $3
+     ORDER BY uploaded_at DESC`,
+    [orgId, entityType.toUpperCase(), entityId]
+  );
+
+  return r.rows;
+});
+
+// Download a file
+app.get("/evidence/download/:fileId", async (req, reply) => {
+  const { orgId } = getAuth(req);
+  const { fileId } = req.params as { fileId: string };
+
+  const r = await pool.query(
+    `SELECT * FROM evidence_files WHERE id = $1 AND org_id = $2`,
+    [fileId, orgId]
+  );
+
+  if (r.rows.length === 0) throw new Error("File not found");
+
+  const file = r.rows[0];
+  const filePath = join(UPLOAD_DIR, file.s3_key);
+  const buffer = await readFile(filePath);
+
+  reply
+    .header("Content-Type", file.mime_type || "application/octet-stream")
+    .header("Content-Disposition", `attachment; filename="${file.file_name}"`)
+    .send(buffer);
+});
+
+// Delete a file
+app.delete("/evidence/:fileId", async (req) => {
+  const { orgId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+
+  const { fileId } = req.params as { fileId: string };
+
+  const r = await pool.query(
+    `DELETE FROM evidence_files WHERE id = $1 AND org_id = $2 RETURNING *`,
+    [fileId, orgId]
+  );
+
+  if (r.rows.length === 0) throw new Error("File not found");
+  return { deleted: true };
+});
+```
+
+Also add `uploads/` to your `.gitignore` so uploaded files don't get pushed to GitHub. Open your `.gitignore` and add:
+```
+uploads/
 app.setErrorHandler((err, _req, reply) => {
   const msg = err instanceof Error ? err.message : "Unknown error";
   reply.status(400).send({ error: msg });
