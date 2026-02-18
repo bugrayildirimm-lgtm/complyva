@@ -1,5 +1,6 @@
-import { createCertification, getCertifications } from "../../lib/api";
+import { createCertification, getCertifications, getEvidence, uploadEvidence, deleteEvidence } from "../../lib/api";
 import type { Certification } from "../../lib/types";
+import EvidencePanel from "../EvidencePanel";
 
 export default async function CertificationsPage() {
   const rows: Certification[] = await getCertifications();
@@ -46,33 +47,35 @@ export default async function CertificationsPage() {
         </form>
       </div>
 
-      <div className="table-card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Framework</th>
-              <th>Issuing Body</th>
-              <th>Expiry</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((c) => (
-              <tr key={c.id}>
-                <td>{c.name}</td>
-                <td>{c.framework_type ?? "-"}</td>
-                <td>{c.issuing_body ?? "-"}</td>
-                <td className="tabular">{c.expiry_date ? String(c.expiry_date).slice(0, 10) : "-"}</td>
-                <td><span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span></td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={5} className="muted">No certifications yet.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {rows.map(async (c) => {
+        const files = await getEvidence("CERTIFICATION", c.id);
+        return (
+          <div key={c.id} className="table-card" style={{ marginBottom: 16, padding: "16px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#111" }}>{c.name}</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
+                  {c.framework_type ?? "-"} · {c.issuing_body ?? "-"} · Expires: {c.expiry_date ? String(c.expiry_date).slice(0, 10) : "-"}
+                </div>
+              </div>
+              <span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
+            </div>
+            <EvidencePanel
+              entityType="CERTIFICATION"
+              entityId={c.id}
+              files={files}
+              uploadAction={uploadEvidence}
+              deleteAction={deleteEvidence}
+            />
+          </div>
+        );
+      })}
+
+      {rows.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 32 }}>
+          <div className="muted">No certifications yet. Create one above.</div>
+        </div>
+      )}
     </>
   );
 }

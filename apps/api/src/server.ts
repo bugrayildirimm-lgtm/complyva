@@ -366,16 +366,17 @@ app.post("/evidence/upload", async (req) => {
   const { orgId, userId, role } = getAuth(req);
   if (role === "VIEWER") throw new Error("Forbidden");
 
-  const data = await req.file();
-  if (!data) throw new Error("No file uploaded");
-
-  const entityType = String((data.fields?.entityType as any)?.value ?? "");
-  const entityId = String((data.fields?.entityId as any)?.value ?? "");
+  const query = req.query as { entityType?: string; entityId?: string };
+  const entityType = query.entityType ?? "";
+  const entityId = query.entityId ?? "";
 
   if (!["CERTIFICATION", "RISK", "AUDIT", "FINDING"].includes(entityType)) {
     throw new Error("Invalid entity type");
   }
   if (!entityId) throw new Error("Missing entity ID");
+
+  const data = await req.file();
+  if (!data) throw new Error("No file uploaded");
 
   const buffer = await data.toBuffer();
   const fileName = data.filename;
@@ -463,9 +464,4 @@ app.listen({ port, host: "0.0.0.0" })
   .catch((err) => {
     app.log.error(err);
     process.exit(1);
-  });
-```
-
-Also add `uploads/` to your `.gitignore` file (the `.gitignore` in your project root, not `server.ts`). Just add this line at the end:
-```
-uploads/
+  })

@@ -162,3 +162,52 @@ export async function createFinding(auditId: string, formData: FormData) {
   revalidatePath(`/audits/${auditId}`);
   revalidatePath("/dashboard");
 }
+// ---------- Evidence Files ----------
+export async function uploadEvidence(entityType: string, entityId: string, formData: FormData) {
+  "use server";
+  const dbUser = await getDbUser();
+
+  const file = formData.get("file") as File;
+  if (!file || file.size === 0) throw new Error("No file selected");
+
+  const uploadForm = new FormData();
+  uploadForm.append("file", file);
+  uploadForm.append("entityType", entityType);
+  uploadForm.append("entityId", entityId);
+
+  const res = await fetch(`${API_BASE}/evidence/upload`, {
+    method: "POST",
+    headers: {
+      "x-org-id": dbUser.orgId,
+      "x-user-id": dbUser.userId,
+      "x-role": dbUser.role,
+    },
+    body: uploadForm,
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "Upload failed");
+  return data;
+}
+
+export async function getEvidence(entityType: string, entityId: string) {
+  return apiFetch(`/evidence/${entityType}/${entityId}`);
+}
+
+export async function deleteEvidence(fileId: string) {
+  "use server";
+  const dbUser = await getDbUser();
+
+  const res = await fetch(`${API_BASE}/evidence/${fileId}`, {
+    method: "DELETE",
+    headers: {
+      "x-org-id": dbUser.orgId,
+      "x-user-id": dbUser.userId,
+      "x-role": dbUser.role,
+    },
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "Delete failed");
+  return data;
+}
