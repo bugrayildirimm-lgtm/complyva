@@ -1,4 +1,8 @@
+/* eslint-disable no-restricted-globals */
 "use client";
+
+declare function alert(message?: any): void;
+declare function confirm(message?: string): boolean;
 
 import { useState } from "react";
 
