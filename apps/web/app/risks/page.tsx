@@ -1,5 +1,6 @@
-import { createRisk, getRisks } from "../../lib/api";
+import { createRisk, getRisks, getEvidence, uploadEvidence, deleteEvidence } from "../../lib/api";
 import type { Risk } from "../../lib/types";
+import EvidencePanel from "../EvidencePanel";
 
 export default async function RisksPage() {
   const rows: Risk[] = await getRisks();
@@ -53,35 +54,35 @@ export default async function RisksPage() {
         </form>
       </div>
 
-      <div className="table-card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Risk</th>
-              <th>Category</th>
-              <th>L</th>
-              <th>I</th>
-              <th>Score</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <td>{r.title}</td>
-                <td>{r.category ?? "-"}</td>
-                <td className="tabular">{r.likelihood}</td>
-                <td className="tabular">{r.impact}</td>
-                <td><span className={`score-badge ${scoreClass(r.inherent_score)}`}>{r.inherent_score}</span></td>
-                <td><span className={`badge badge-${r.status.toLowerCase()}`}>{r.status.replace(/_/g, " ")}</span></td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={6} className="muted">No risks yet.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {rows.map(async (r) => {
+        const files = await getEvidence("RISK", r.id);
+        return (
+          <div key={r.id} className="table-card" style={{ marginBottom: 16, padding: "16px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#111" }}>{r.title}</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
+                  {r.category ?? "-"} · L:{r.likelihood} × I:{r.impact} = <span className={`score-badge ${scoreClass(r.inherent_score)}`}>{r.inherent_score}</span>
+                </div>
+              </div>
+              <span className={`badge badge-${r.status.toLowerCase()}`}>{r.status.replace(/_/g, " ")}</span>
+            </div>
+            <EvidencePanel
+              entityType="RISK"
+              entityId={r.id}
+              files={files}
+              uploadAction={uploadEvidence}
+              deleteAction={deleteEvidence}
+            />
+          </div>
+        );
+      })}
+
+      {rows.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 32 }}>
+          <div className="muted">No risks yet. Create one above.</div>
+        </div>
+      )}
     </>
   );
 }

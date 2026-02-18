@@ -1,73 +1,12 @@
-import { revalidatePath } from "next/cache";
+"use server";
+
 import { auth, currentUser } from "@clerk/nextjs/server";
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
-const API_BASE = process.env.API_BASE || "http://localhost:4000";
+const API_BASE = process.env.API_BASE ?? "http://localhost:4000";
 
-async function getDbUser() {
-  const { userId: clerkUserId } = await auth();
-  if (!clerkUserId) throw new Error("Not signed in");
-
-  const user = await currentUser();
-  if (!user) throw new Error("Not signed in");
-
-  const res = await fetch(`${API_BASE}/auth/sync`, {
-    method: "POST",
-    headers: {
-      "x-clerk-user-id": clerkUserId,
-      "x-clerk-email": user.emailAddresses[0]?.emailAddress ?? "",
-      "x-clerk-name": `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
-    },
-    body: "{}",
-    cache: "no-store",
-  });
-
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error ?? "Sync failed");
-  return data as { userId: string; orgId: string; role: string };
-}
-
-async function apiFetch(path: string, init?: RequestInit) {
-  const dbUser = await getDbUser();
-
-  const res = await fetch(`${API_BASE}${path}`, {
-    ...init,
-    headers: {
-      ...(init?.headers ?? {}),
-      "x-org-id": dbUser.orgId,
-      "x-user-id": dbUser.userId,
-      "x-role": dbUser.role,
-    },
-    cache: "no-store",
-  });
-
-  const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
-
-  if (!res.ok) {
-    const msg = data?.error ?? `HTTP ${res.status}`;
-    throw new Error(msg);
-  }
-  return data;
-}
-
-// ---------- Reads ----------
-export async function getSummary() {
-  return apiFetch("/dashboard/summary");
-}
-export async function getCertifications() {
-  return apiFetch("/certifications");
-}
-export async function getRisks() {
-  return apiFetch("/risks");
-}
-export async function getAudits() {
-  return apiFetch("/audits");
-}
-export async function getFindings(auditId: string) {
-  return apiFetch(`/audits/${auditId}/findings`);
-}
-
-// ---------- Helpers ----------
+// --- helpers ---
 function str(formData: FormData, name: string) {
   const v = String(formData.get(name) ?? "").trim();
   return v === "" ? undefined : v;
@@ -79,11 +18,67 @@ function num(formData: FormData, name: string, fallback: number) {
   return isNaN(n) ? fallback : n;
 }
 
-// ---------- Writes (Server Actions) ----------
+// --- DB user sync ---
+async function getDbUser() {
+  const { userId: clerkUserId } = await auth();
+  const user = await currentUser();
+  if (!user) throw new Error("Not signed in");
+
+  const res = await fetch(`${API_BASE}/auth/sync`, {
+    method: "POST",
+    headers: {
+      "x-clerk-user-id": clerkUserId!,
+      "x-clerk-email": user.emailAddresses[0]?.emailAddress ?? "",
+      "x-clerk-name": `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
+    },
+    body: "{}",
+  });
+
+  const data = await res.json();
+  if (!res.ok) throw new Error(data?.error ?? "Sync failed");
+  return data as { userId: string; orgId: string; role: string };
+}
+
+// --- Generic fetch ---
+async function apiFetch(path: string, init?: RequestInit) {
+  const dbUser = await getDbUser();
+  const res = await fetch(`${API_BASE}${path}`, {
+    ...init,
+    headers: {
+      ...init?.headers,
+      "x-org-id": dbUser.orgId,
+      "x-user-id": dbUser.userId,
+      "x-role": dbUser.role,
+    },
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    const msg = data?.error ?? `HTTP ${res.status}`;
+    throw new Error(msg);
+  }
+  return data;
+}
+
+// ---------- Dashboard ----------
+export async function getSummary() {
+  return apiFetch("/dashboard/summary");
+}
+
+// ---------- Certifications ----------
+export async function getCertifications() {
+  return apiFetch("/certifications");
+}
+
 export async function createCertification(formData: FormData) {
   "use server";
+  const name = String(formData.get("name") ?? "").trim();
+  if (name.length < 2) {
+    redirect("/certifications");
+    return;
+  }
+
   const payload = {
-    name: String(formData.get("name") ?? ""),
+    name,
     frameworkType: str(formData, "frameworkType"),
     issuingBody: str(formData, "issuingBody"),
     issueDate: str(formData, "issueDate"),
@@ -101,10 +96,21 @@ export async function createCertification(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+// ---------- Risks ----------
+export async function getRisks() {
+  return apiFetch("/risks");
+}
+
 export async function createRisk(formData: FormData) {
   "use server";
+  const title = String(formData.get("title") ?? "").trim();
+  if (title.length < 2) {
+    redirect("/risks");
+    return;
+  }
+
   const payload = {
-    title: String(formData.get("title") ?? ""),
+    title,
     category: str(formData, "category"),
     likelihood: num(formData, "likelihood", 3),
     impact: num(formData, "impact", 3),
@@ -122,11 +128,22 @@ export async function createRisk(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+// ---------- Audits ----------
+export async function getAudits() {
+  return apiFetch("/audits");
+}
+
 export async function createAudit(formData: FormData) {
   "use server";
+  const title = String(formData.get("title") ?? "").trim();
+  if (title.length < 2) {
+    redirect("/audits");
+    return;
+  }
+
   const payload = {
     type: String(formData.get("type") ?? "INTERNAL"),
-    title: String(formData.get("title") ?? ""),
+    title,
     scope: str(formData, "scope"),
     auditor: str(formData, "auditor"),
     startDate: str(formData, "startDate"),
@@ -143,11 +160,22 @@ export async function createAudit(formData: FormData) {
   revalidatePath("/dashboard");
 }
 
+// ---------- Findings ----------
+export async function getFindings(auditId: string) {
+  return apiFetch(`/audits/${auditId}/findings`);
+}
+
 export async function createFinding(auditId: string, formData: FormData) {
   "use server";
+  const title = String(formData.get("title") ?? "").trim();
+  if (title.length < 2) {
+    redirect(`/audits/${auditId}`);
+    return;
+  }
+
   const payload = {
     auditId,
-    title: String(formData.get("title") ?? ""),
+    title,
     severity: String(formData.get("severity") ?? "MEDIUM"),
     recommendation: str(formData, "recommendation"),
     dueDate: str(formData, "dueDate"),
@@ -162,6 +190,7 @@ export async function createFinding(auditId: string, formData: FormData) {
   revalidatePath(`/audits/${auditId}`);
   revalidatePath("/dashboard");
 }
+
 // ---------- Evidence Files ----------
 export async function uploadEvidence(entityType: string, entityId: string, formData: FormData) {
   "use server";
@@ -172,10 +201,8 @@ export async function uploadEvidence(entityType: string, entityId: string, formD
 
   const uploadForm = new FormData();
   uploadForm.append("file", file);
-  uploadForm.append("entityType", entityType);
-  uploadForm.append("entityId", entityId);
 
-  const res = await fetch(`${API_BASE}/evidence/upload`, {
+  const res = await fetch(`${API_BASE}/evidence/upload?entityType=${entityType}&entityId=${entityId}`, {
     method: "POST",
     headers: {
       "x-org-id": dbUser.orgId,

@@ -84,10 +84,39 @@ app.get("/dashboard/summary", async (req) => {
     [orgId]
   );
 
+  const activeAudits = await pool.query(
+    `select count(*)::int as count
+     from audits
+     where org_id = $1
+       and status = 'IN_PROGRESS'`,
+    [orgId]
+  );
+
+  const recentRisks = await pool.query(
+    `select id, title, category, likelihood, impact, inherent_score, status
+     from risks
+     where org_id = $1
+     order by created_at desc
+     limit 5`,
+    [orgId]
+  );
+
+  const upcomingAudits = await pool.query(
+    `select id, title, type, status, start_date
+     from audits
+     where org_id = $1
+     order by created_at desc
+     limit 5`,
+    [orgId]
+  );
+
   return {
     expiringSoon: expiringSoon.rows[0]?.count ?? 0,
     openRisks: openRisks.rows[0]?.count ?? 0,
-    openFindings: openFindings.rows[0]?.count ?? 0
+    openFindings: openFindings.rows[0]?.count ?? 0,
+    activeAudits: activeAudits.rows[0]?.count ?? 0,
+    recentRisks: recentRisks.rows,
+    upcomingAudits: upcomingAudits.rows,
   };
 });
 

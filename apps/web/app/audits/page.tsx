@@ -1,5 +1,6 @@
-import { createAudit, getAudits } from "../../lib/api";
+import { createAudit, getAudits, getEvidence, uploadEvidence, deleteEvidence } from "../../lib/api";
 import type { Audit } from "../../lib/types";
+import EvidencePanel from "../EvidencePanel";
 
 export default async function AuditsPage() {
   const rows: Audit[] = await getAudits();
@@ -55,33 +56,39 @@ export default async function AuditsPage() {
         </form>
       </div>
 
-      <div className="table-card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Audit</th>
-              <th>Type</th>
-              <th>Status</th>
-              <th>Start Date</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((a) => (
-              <tr key={a.id}>
-                <td>{a.title}</td>
-                <td><span className={`badge badge-${a.type.toLowerCase()}`}>{a.type}</span></td>
-                <td><span className={`badge badge-${a.status.toLowerCase()}`}>{a.status.replace(/_/g, " ")}</span></td>
-                <td className="tabular">{a.start_date ? String(a.start_date).slice(0, 10) : "-"}</td>
-                <td><a href={`/audits/${a.id}`} className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12 }}>View Findings</a></td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={5} className="muted">No audits yet.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {rows.map(async (a) => {
+        const files = await getEvidence("AUDIT", a.id);
+        return (
+          <div key={a.id} className="table-card" style={{ marginBottom: 16, padding: "16px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#111" }}>{a.title}</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
+                  {a.start_date ? String(a.start_date).slice(0, 10) : "-"} · {a.auditor ?? "-"}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <span className={`badge badge-${a.type.toLowerCase()}`}>{a.type}</span>
+                <span className={`badge badge-${a.status.toLowerCase()}`}>{a.status.replace(/_/g, " ")}</span>
+                <a href={`/audits/${a.id}`} className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12 }}>Findings</a>
+              </div>
+            </div>
+            <EvidencePanel
+              entityType="AUDIT"
+              entityId={a.id}
+              files={files}
+              uploadAction={uploadEvidence}
+              deleteAction={deleteEvidence}
+            />
+          </div>
+        );
+      })}
+
+      {rows.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 32 }}>
+          <div className="muted">No audits yet. Create one above.</div>
+        </div>
+      )}
     </>
   );
 }

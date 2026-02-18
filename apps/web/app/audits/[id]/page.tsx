@@ -1,5 +1,6 @@
-import { createFinding, getFindings } from "../../../lib/api";
+import { createFinding, getFindings, getEvidence, uploadEvidence, deleteEvidence } from "../../../lib/api";
 import type { Finding } from "../../../lib/types";
+import EvidencePanel from "../../EvidencePanel";
 
 export default async function AuditFindingsPage({ params }: { params: { id: string } }) {
   const auditId = params.id;
@@ -50,31 +51,38 @@ export default async function AuditFindingsPage({ params }: { params: { id: stri
         </form>
       </div>
 
-      <div className="table-card">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Finding</th>
-              <th>Severity</th>
-              <th>Status</th>
-              <th>Due Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((f) => (
-              <tr key={f.id}>
-                <td>{f.title}</td>
-                <td><span className={`badge badge-${f.severity.toLowerCase()}`}>{f.severity}</span></td>
-                <td><span className={`badge badge-${f.status.toLowerCase()}`}>{f.status.replace(/_/g, " ")}</span></td>
-                <td className="tabular">{f.due_date ? String(f.due_date).slice(0, 10) : "-"}</td>
-              </tr>
-            ))}
-            {rows.length === 0 && (
-              <tr><td colSpan={4} className="muted">No findings yet.</td></tr>
-            )}
-          </tbody>
-        </table>
-      </div>
+      {rows.map(async (f) => {
+        const files = await getEvidence("FINDING", f.id);
+        return (
+          <div key={f.id} className="table-card" style={{ marginBottom: 16, padding: "16px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+              <div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#111" }}>{f.title}</div>
+                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
+                  Due: {f.due_date ? String(f.due_date).slice(0, 10) : "-"}
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <span className={`badge badge-${f.severity.toLowerCase()}`}>{f.severity}</span>
+                <span className={`badge badge-${f.status.toLowerCase()}`}>{f.status.replace(/_/g, " ")}</span>
+              </div>
+            </div>
+            <EvidencePanel
+              entityType="FINDING"
+              entityId={f.id}
+              files={files}
+              uploadAction={uploadEvidence}
+              deleteAction={deleteEvidence}
+            />
+          </div>
+        );
+      })}
+
+      {rows.length === 0 && (
+        <div className="card" style={{ textAlign: "center", padding: 32 }}>
+          <div className="muted">No findings yet. Create one above.</div>
+        </div>
+      )}
     </>
   );
 }
