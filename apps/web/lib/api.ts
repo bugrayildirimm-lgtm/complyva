@@ -238,3 +238,7 @@ export async function deleteEvidence(fileId: string) {
   if (!res.ok) throw new Error(data?.error ?? "Delete failed");
   return data;
 }
+// ---------- Activity Log ----------
+export async function getActivity() {
+  return apiFetch("/activity");
+}

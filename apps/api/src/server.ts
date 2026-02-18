@@ -7,6 +7,7 @@ import multipart from "@fastify/multipart";
 import { mkdir, writeFile, readFile } from "fs/promises";
 import { join } from "path";
 import { runAllAlerts, sendWeeklyDigest } from "./emails";
+import { logActivity } from "./activity";
 
 const app = Fastify({ logger: true });
 app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
@@ -42,7 +43,8 @@ app.get("/", async () => ({
     "/evidence/download/:fileId (GET)",
     "/evidence/:fileId (DELETE)",
     "/alerts/run (POST)",
-    "/alerts/digest (POST)"
+    "/alerts/digest (POST)",
+    "/activity (GET)"
   ]
 }));
 
@@ -172,6 +174,7 @@ app.post("/certifications", async (req) => {
     ]
   );
 
+  await logActivity(orgId, userId, "CREATED", "CERTIFICATION", r.rows[0].id, p.name);
   return r.rows[0];
 });
 
@@ -233,6 +236,7 @@ app.post("/risks", async (req) => {
     ]
   );
 
+  await logActivity(orgId, userId, "CREATED", "RISK", r.rows[0].id, p.title, `Score: ${r.rows[0].inherent_score}`);
   return r.rows[0];
 });
 
@@ -285,6 +289,8 @@ app.post("/audits", async (req) => {
     ]
   );
 
+  const { userId } = getAuth(req);
+  await logActivity(orgId, userId, "CREATED", "AUDIT", r.rows[0].id, p.title, `Type: ${p.type}`);
   return r.rows[0];
 });
 
@@ -340,6 +346,7 @@ app.post("/findings", async (req) => {
     ]
   );
 
+  await logActivity(orgId, userId, "CREATED", "FINDING", r.rows[0].id, p.title, `Severity: ${p.severity}`);
   return r.rows[0];
 });
 
@@ -389,6 +396,7 @@ app.post("/auth/sync", async (req) => {
     [orgId, userId]
   );
 
+  await logActivity(orgId, userId, "SIGNED_UP", "USER", userId, fullName || email);
   return { userId, orgId, role: "ADMIN" };
 });
 
@@ -430,6 +438,7 @@ app.post("/evidence/upload", async (req) => {
     [orgId, entityType, entityId, fileName, mimeType, fileSize, storageKey, userId]
   );
 
+  await logActivity(orgId, userId, "UPLOADED", "EVIDENCE", r.rows[0].id, fileName, `For ${entityType} ${entityId}`);
   return r.rows[0];
 });
 
@@ -481,7 +490,29 @@ app.delete("/evidence/:fileId", async (req) => {
   );
 
   if (r.rows.length === 0) throw new Error("File not found");
+
+  const { userId } = getAuth(req);
+  await logActivity(orgId, userId, "DELETED", "EVIDENCE", fileId, r.rows[0].file_name);
   return { deleted: true };
+});
+
+// =======================
+// Activity Log
+// =======================
+app.get("/activity", async (req) => {
+  const { orgId } = getAuth(req);
+
+  const r = await pool.query(
+    `SELECT a.*, u.full_name, u.email
+     FROM activity_log a
+     LEFT JOIN users u ON u.id = a.actor_user_id
+     WHERE a.org_id = $1
+     ORDER BY a.created_at DESC
+     LIMIT 100`,
+    [orgId]
+  );
+
+  return r.rows;
 });
 
 // =======================
@@ -501,12 +532,10 @@ app.post("/alerts/digest", async (req) => {
   return { ok: true, message: "Weekly digest sent" };
 });
 
-// Auto-run alerts every 24 hours
 setInterval(() => {
   runAllAlerts().catch(console.error);
 }, 24 * 60 * 60 * 1000);
 
-// Auto-run weekly digest every Monday at 8am (check every hour)
 setInterval(() => {
   const now = new Date();
   if (now.getDay() === 1 && now.getHours() === 8) {
