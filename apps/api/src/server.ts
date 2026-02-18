@@ -1,3 +1,4 @@
+import "dotenv/config";
 import Fastify from "fastify";
 import { z } from "zod";
 import { pool } from "./db";
@@ -5,6 +6,7 @@ import { getAuth } from "./auth";
 import multipart from "@fastify/multipart";
 import { mkdir, writeFile, readFile } from "fs/promises";
 import { join } from "path";
+import { runAllAlerts, sendWeeklyDigest } from "./emails";
 
 const app = Fastify({ logger: true });
 app.register(multipart, { limits: { fileSize: 20 * 1024 * 1024 } });
@@ -38,7 +40,9 @@ app.get("/", async () => ({
     "/evidence/upload (POST)",
     "/evidence/:entityType/:entityId (GET)",
     "/evidence/download/:fileId (GET)",
-    "/evidence/:fileId (DELETE)"
+    "/evidence/:fileId (DELETE)",
+    "/alerts/run (POST)",
+    "/alerts/digest (POST)"
   ]
 }));
 
@@ -480,6 +484,36 @@ app.delete("/evidence/:fileId", async (req) => {
   return { deleted: true };
 });
 
+// =======================
+// Email Alerts
+// =======================
+app.post("/alerts/run", async (req) => {
+  const { role } = getAuth(req);
+  if (role !== "ADMIN") throw new Error("Forbidden");
+  await runAllAlerts();
+  return { ok: true, message: "Alert checks completed" };
+});
+
+app.post("/alerts/digest", async (req) => {
+  const { role } = getAuth(req);
+  if (role !== "ADMIN") throw new Error("Forbidden");
+  await sendWeeklyDigest();
+  return { ok: true, message: "Weekly digest sent" };
+});
+
+// Auto-run alerts every 24 hours
+setInterval(() => {
+  runAllAlerts().catch(console.error);
+}, 24 * 60 * 60 * 1000);
+
+// Auto-run weekly digest every Monday at 8am (check every hour)
+setInterval(() => {
+  const now = new Date();
+  if (now.getDay() === 1 && now.getHours() === 8) {
+    sendWeeklyDigest().catch(console.error);
+  }
+}, 60 * 60 * 1000);
+
 // --- Error handler ---
 app.setErrorHandler((err, _req, reply) => {
   const msg = err instanceof Error ? err.message : "Unknown error";
@@ -493,4 +527,4 @@ app.listen({ port, host: "0.0.0.0" })
   .catch((err) => {
     app.log.error(err);
     process.exit(1);
-  })
+  });
