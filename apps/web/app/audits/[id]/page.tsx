@@ -2,8 +2,8 @@ import { createFinding, getFindings, getEvidence, uploadEvidence, deleteEvidence
 import type { Finding } from "../../../lib/types";
 import EvidencePanel from "../../EvidencePanel";
 
-export default async function AuditFindingsPage({ params }: { params: { id: string } }) {
-  const auditId = params.id;
+export default async function AuditFindingsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id: auditId } = await params;
   const rows: Finding[] = await getFindings(auditId);
 
   async function action(formData: FormData) {
