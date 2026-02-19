@@ -1,3 +1,4 @@
+import "./landing.css";
 import {
   ClerkProvider,
   SignInButton,
