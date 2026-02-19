@@ -2,7 +2,7 @@ import { SignUp } from "@clerk/nextjs";
 
 export default function SignUpPage() {
   return (
-    <div className="landing" style={{
+    <div style={{
       minHeight: "100vh",
       display: "flex",
       alignItems: "center",
@@ -13,7 +13,12 @@ export default function SignUpPage() {
         <a href="/" style={{ display: "inline-block", marginBottom: 32 }}>
           <img src="/logo.png" alt="Complyva" style={{ height: 28 }} />
         </a>
-        <SignUp afterSignUpUrl="/dashboard" />
+        <SignUp
+          path="/sign-up"
+          routing="path"
+          signInUrl="/sign-in"
+          afterSignUpUrl="/dashboard"
+        />
       </div>
     </div>
   );
