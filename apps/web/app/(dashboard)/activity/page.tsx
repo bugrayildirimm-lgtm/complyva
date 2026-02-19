@@ -1,4 +1,4 @@
-import { getActivity } from "../../lib/api";
+import { getActivity } from "../../../lib/api";
 
 const ACTION_ICONS: Record<string, string> = {
   CREATED: "🟢",

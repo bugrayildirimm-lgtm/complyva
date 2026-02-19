@@ -1,5 +1,5 @@
-import { createRisk, getRisks, getEvidence, uploadEvidence, deleteEvidence } from "../../lib/api";
-import type { Risk } from "../../lib/types";
+import { createRisk, getRisks, getEvidence, uploadEvidence, deleteEvidence } from "../../../lib/api";
+import type { Risk } from "../../../lib/types";
 import EvidencePanel from "../EvidencePanel";
 
 export default async function RisksPage() {

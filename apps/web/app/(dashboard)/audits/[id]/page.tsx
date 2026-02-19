@@ -1,5 +1,5 @@
-import { createFinding, getFindings, getEvidence, uploadEvidence, deleteEvidence } from "../../../lib/api";
-import type { Finding } from "../../../lib/types";
+import { createFinding, getFindings, getEvidence, uploadEvidence, deleteEvidence } from "../../../../lib/api";
+import type { Finding } from "../../../../lib/types";
 import EvidencePanel from "../../EvidencePanel";
 
 export default async function AuditFindingsPage({ params }: { params: Promise<{ id: string }> }) {

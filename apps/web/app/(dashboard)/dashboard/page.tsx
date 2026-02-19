@@ -1,4 +1,4 @@
-import { getSummary } from "../../lib/api";
+import { getSummary } from "../../../lib/api";
 
 export default async function Dashboard() {
   const s = await getSummary();

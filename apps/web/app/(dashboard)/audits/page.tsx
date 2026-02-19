@@ -1,5 +1,5 @@
-import { createAudit, getAudits, getEvidence, uploadEvidence, deleteEvidence } from "../../lib/api";
-import type { Audit } from "../../lib/types";
+import { createAudit, getAudits, getEvidence, uploadEvidence, deleteEvidence } from "../../../lib/api";
+import type { Audit } from "../../../lib/types";
 import EvidencePanel from "../EvidencePanel";
 
 export default async function AuditsPage() {

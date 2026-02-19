@@ -1,5 +1,5 @@
-import { createCertification, getCertifications, getEvidence, uploadEvidence, deleteEvidence } from "../../lib/api";
-import type { Certification } from "../../lib/types";
+import { createCertification, getCertifications, getEvidence, uploadEvidence, deleteEvidence } from "../../../lib/api";
+import type { Certification } from "../../../lib/types";
 import EvidencePanel from "../EvidencePanel";
 
 export default async function CertificationsPage() {
