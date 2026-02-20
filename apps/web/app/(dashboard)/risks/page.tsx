@@ -1,6 +1,7 @@
 import { createRisk, getRisks } from "../../../lib/api";
 import type { Risk } from "../../../lib/types";
 import RiskListClient from "./RiskListClient";
+import ExportButton from "../ExportButton";
 
 export default async function RisksPage() {
   const rows: Risk[] = await getRisks();
@@ -12,6 +13,7 @@ export default async function RisksPage() {
           <h1 className="page-title">Risk Register</h1>
           <p className="page-subtitle">Risk register, treatment tracking, and approval workflow</p>
         </div>
+        <ExportButton type="risks" />
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>

@@ -1,5 +1,6 @@
 import { createCertification, getCertifications } from "../../../lib/api";
 import type { Certification } from "../../../lib/types";
+import ExportButton from "../ExportButton";
 
 export default async function CertificationsPage() {
   const rows: Certification[] = await getCertifications();
@@ -7,7 +8,7 @@ export default async function CertificationsPage() {
   function isExpiringSoon(date: string | null) {
     if (!date) return false;
     const diff = new Date(date).getTime() - Date.now();
-    return diff > 0 && diff < 60 * 24 * 60 * 60 * 1000; // 60 days
+    return diff > 0 && diff < 60 * 24 * 60 * 60 * 1000;
   }
 
   return (
@@ -17,6 +18,7 @@ export default async function CertificationsPage() {
           <h1 className="page-title">Certifications</h1>
           <p className="page-subtitle">Track certification lifecycle and renewals</p>
         </div>
+        <ExportButton type="certifications" />
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>

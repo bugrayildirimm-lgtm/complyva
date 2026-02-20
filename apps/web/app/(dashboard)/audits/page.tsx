@@ -1,5 +1,6 @@
 import { createAudit, getAudits } from "../../../lib/api";
 import type { Audit } from "../../../lib/types";
+import ExportButton from "../ExportButton";
 
 export default async function AuditsPage() {
   const rows: Audit[] = await getAudits();
@@ -11,6 +12,7 @@ export default async function AuditsPage() {
           <h1 className="page-title">Audits</h1>
           <p className="page-subtitle">Audit engagements and findings</p>
         </div>
+        <ExportButton type="audits" />
       </div>
 
       <div className="card" style={{ marginBottom: 16 }}>
