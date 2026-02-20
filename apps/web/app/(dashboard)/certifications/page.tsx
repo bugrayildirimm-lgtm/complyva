@@ -1,9 +1,14 @@
-import { createCertification, getCertifications, getEvidence, uploadEvidence, deleteEvidence } from "../../../lib/api";
+import { createCertification, getCertifications } from "../../../lib/api";
 import type { Certification } from "../../../lib/types";
-import EvidencePanel from "../EvidencePanel";
 
 export default async function CertificationsPage() {
   const rows: Certification[] = await getCertifications();
+
+  function isExpiringSoon(date: string | null) {
+    if (!date) return false;
+    const diff = new Date(date).getTime() - Date.now();
+    return diff > 0 && diff < 60 * 24 * 60 * 60 * 1000; // 60 days
+  }
 
   return (
     <>
@@ -47,35 +52,50 @@ export default async function CertificationsPage() {
         </form>
       </div>
 
-      {rows.map(async (c) => {
-        const files = await getEvidence("CERTIFICATION", c.id);
-        return (
-          <div key={c.id} className="table-card" style={{ marginBottom: 16, padding: "16px 20px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "#111" }}>{c.name}</div>
-                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
-                  {c.framework_type ?? "-"} · {c.issuing_body ?? "-"} · Expires: {c.expiry_date ? String(c.expiry_date).slice(0, 10) : "-"}
-                </div>
-              </div>
-              <span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span>
-            </div>
-            <EvidencePanel
-              entityType="CERTIFICATION"
-              entityId={c.id}
-              files={files}
-              uploadAction={uploadEvidence}
-              deleteAction={deleteEvidence}
-            />
-          </div>
-        );
-      })}
-
-      {rows.length === 0 && (
-        <div className="card" style={{ textAlign: "center", padding: 32 }}>
-          <div className="muted">No certifications yet. Create one above.</div>
-        </div>
-      )}
+      <div className="table-card">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Framework</th>
+              <th>Issuing Body</th>
+              <th>Issue Date</th>
+              <th>Expiry Date</th>
+              <th>Status</th>
+              <th style={{ width: 80 }}></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((c) => (
+              <tr key={c.id}>
+                <td>
+                  <a href={`/certifications/${c.id}`} style={{ fontWeight: 550, color: "#111", textDecoration: "none" }}>
+                    {c.name}
+                  </a>
+                </td>
+                <td style={{ fontSize: 13 }}>{c.framework_type || "—"}</td>
+                <td style={{ fontSize: 13 }}>{c.issuing_body || "—"}</td>
+                <td style={{ fontSize: 13 }}>{c.issue_date ? String(c.issue_date).slice(0, 10) : "—"}</td>
+                <td style={{ fontSize: 13 }}>
+                  {c.expiry_date ? (
+                    <span style={{ color: isExpiringSoon(c.expiry_date) ? "#f59e0b" : undefined, fontWeight: isExpiringSoon(c.expiry_date) ? 600 : undefined }}>
+                      {String(c.expiry_date).slice(0, 10)}
+                      {isExpiringSoon(c.expiry_date) && " ⚠"}
+                    </span>
+                  ) : "—"}
+                </td>
+                <td><span className={`badge badge-${c.status.toLowerCase()}`}>{c.status}</span></td>
+                <td>
+                  <a href={`/certifications/${c.id}`} className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: 12 }}>Open →</a>
+                </td>
+              </tr>
+            ))}
+            {rows.length === 0 && (
+              <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 32 }}>No certifications yet.</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
     </>
   );
 }

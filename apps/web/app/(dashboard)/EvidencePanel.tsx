@@ -66,6 +66,13 @@ export default function EvidencePanel({
     }
   }
 
+  function handleDownload(fileId: string, fileName: string) {
+    const link = document.createElement("a");
+    link.href = `/api/evidence/download/${fileId}`;
+    link.download = fileName;
+    link.click();
+  }
+
   return (
     <div className="card" style={{ marginTop: 16 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
@@ -129,6 +136,15 @@ export default function EvidencePanel({
                 </div>
               </div>
               <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  onClick={() => handleDownload(f.id, f.file_name)}
+                  style={{
+                    padding: "4px 8px", borderRadius: 6, border: "1px solid #e8eaed",
+                    background: "#fff", fontSize: 11, color: "#2563eb", cursor: "pointer",
+                  }}
+                >
+                  ↓ Download
+                </button>
                 <button
                   onClick={() => handleDelete(f.id)}
                   style={{
