@@ -1,23 +1,16 @@
-import { createRisk, getRisks, getEvidence, uploadEvidence, deleteEvidence } from "../../../lib/api";
+import { createRisk, getRisks } from "../../../lib/api";
 import type { Risk } from "../../../lib/types";
-import EvidencePanel from "../EvidencePanel";
+import RiskListClient from "./RiskListClient";
 
 export default async function RisksPage() {
   const rows: Risk[] = await getRisks();
-
-  function scoreClass(score: number) {
-    if (score >= 20) return "score-critical";
-    if (score >= 10) return "score-high";
-    if (score >= 5) return "score-medium";
-    return "score-low";
-  }
 
   return (
     <>
       <div className="page-header">
         <div>
-          <h1 className="page-title">Risks</h1>
-          <p className="page-subtitle">Risk register and treatment tracking</p>
+          <h1 className="page-title">Risk Register</h1>
+          <p className="page-subtitle">Risk register, treatment tracking, and approval workflow</p>
         </div>
       </div>
 
@@ -54,35 +47,7 @@ export default async function RisksPage() {
         </form>
       </div>
 
-      {rows.map(async (r) => {
-        const files = await getEvidence("RISK", r.id);
-        return (
-          <div key={r.id} className="table-card" style={{ marginBottom: 16, padding: "16px 20px" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
-              <div>
-                <div style={{ fontSize: 15, fontWeight: 600, color: "#111" }}>{r.title}</div>
-                <div style={{ fontSize: 12, color: "#9ca3af", marginTop: 2 }}>
-                  {r.category ?? "-"} · L:{r.likelihood} × I:{r.impact} = <span className={`score-badge ${scoreClass(r.inherent_score)}`}>{r.inherent_score}</span>
-                </div>
-              </div>
-              <span className={`badge badge-${r.status.toLowerCase()}`}>{r.status.replace(/_/g, " ")}</span>
-            </div>
-            <EvidencePanel
-              entityType="RISK"
-              entityId={r.id}
-              files={files}
-              uploadAction={uploadEvidence}
-              deleteAction={deleteEvidence}
-            />
-          </div>
-        );
-      })}
-
-      {rows.length === 0 && (
-        <div className="card" style={{ textAlign: "center", padding: 32 }}>
-          <div className="muted">No risks yet. Create one above.</div>
-        </div>
-      )}
+      <RiskListClient risks={rows} />
     </>
   );
 }
