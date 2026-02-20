@@ -437,3 +437,7 @@ a { color: inherit; text-decoration: none; }
   .metrics-row { flex-direction: column; }
   .page-content { padding: 20px 16px; }
 }
+.btn-danger { background: #ef4444; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+.btn-danger:hover { background: #dc2626; }
+.btn-warning { background: #f59e0b; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+.btn-warning:hover { background: #d97706; }

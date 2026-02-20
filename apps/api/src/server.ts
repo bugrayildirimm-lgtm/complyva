@@ -33,29 +33,23 @@ app.get("/", async () => ({
     "/health",
     "/debug/tables",
     "/dashboard/summary",
-    "/certifications (GET, POST)",
-    "/risks (GET, POST)",
-    "/audits (GET, POST)",
-    "/findings (POST)",
-    "/audits/:id/findings (GET)",
-    "/evidence/upload (POST)",
-    "/evidence/:entityType/:entityId (GET)",
-    "/evidence/download/:fileId (GET)",
-    "/evidence/:fileId (DELETE)",
+    "/certifications (GET, POST, PUT, DELETE)",
+    "/risks (GET, POST, PUT, DELETE)",
+    "/audits (GET, POST, PUT, DELETE)",
+    "/findings (GET, POST, PUT, DELETE)",
+    "/evidence (GET, POST, DELETE)",
     "/alerts/run (POST)",
     "/alerts/digest (POST)",
-    "/activity (GET)"
-  ]
+    "/activity (GET)",
+  ],
 }));
 
 app.get("/health", async () => ({ ok: true }));
 
 app.get("/debug/tables", async () => {
   const r = await pool.query(`
-    select tablename
-    from pg_tables
-    where schemaname = 'public'
-    order by tablename;
+    select tablename from pg_tables
+    where schemaname = 'public' order by tablename;
   `);
   return r.rows;
 });
@@ -65,54 +59,34 @@ app.get("/dashboard/summary", async (req) => {
   const { orgId } = getAuth(req);
 
   const expiringSoon = await pool.query(
-    `select count(*)::int as count
-     from certifications
-     where org_id = $1
-       and expiry_date is not null
-       and expiry_date <= (current_date + interval '60 days')
-       and status = 'ACTIVE'`,
+    `select count(*)::int as count from certifications
+     where org_id = $1 and expiry_date is not null
+       and expiry_date <= (current_date + interval '60 days') and status = 'ACTIVE'`,
     [orgId]
   );
-
   const openRisks = await pool.query(
-    `select count(*)::int as count
-     from risks
-     where org_id = $1
-       and status in ('OPEN','IN_TREATMENT')`,
+    `select count(*)::int as count from risks
+     where org_id = $1 and status in ('OPEN','IN_TREATMENT')`,
     [orgId]
   );
-
   const openFindings = await pool.query(
-    `select count(*)::int as count
-     from audit_findings
-     where org_id = $1
-       and status in ('OPEN','IN_PROGRESS')`,
+    `select count(*)::int as count from audit_findings
+     where org_id = $1 and status in ('OPEN','IN_PROGRESS')`,
     [orgId]
   );
-
   const activeAudits = await pool.query(
-    `select count(*)::int as count
-     from audits
-     where org_id = $1
-       and status = 'IN_PROGRESS'`,
+    `select count(*)::int as count from audits
+     where org_id = $1 and status = 'IN_PROGRESS'`,
     [orgId]
   );
-
   const recentRisks = await pool.query(
     `select id, title, category, likelihood, impact, inherent_score, status
-     from risks
-     where org_id = $1
-     order by created_at desc
-     limit 5`,
+     from risks where org_id = $1 order by created_at desc limit 5`,
     [orgId]
   );
-
   const upcomingAudits = await pool.query(
     `select id, title, type, status, start_date
-     from audits
-     where org_id = $1
-     order by created_at desc
-     limit 5`,
+     from audits where org_id = $1 order by created_at desc limit 5`,
     [orgId]
   );
 
@@ -129,59 +103,95 @@ app.get("/dashboard/summary", async (req) => {
 // =======================
 // Certifications
 // =======================
-const CreateCertification = z.object({
+const CertificationSchema = z.object({
   name: z.string().min(2).max(200),
   frameworkType: z.string().max(200).optional(),
   issuingBody: z.string().max(200).optional(),
   issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   expiryDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  notes: z.string().max(5000).optional()
+  status: z.enum(["ACTIVE", "EXPIRED", "REVOKED", "SUSPENDED"]).optional(),
+  notes: z.string().max(5000).optional(),
 });
 
 app.get("/certifications", async (req) => {
   const { orgId } = getAuth(req);
   const r = await pool.query(
-    `select * from certifications
-     where org_id = $1
-     order by created_at desc
-     limit 200`,
+    `select * from certifications where org_id = $1 order by created_at desc limit 200`,
     [orgId]
   );
   return r.rows;
 });
 
+app.get("/certifications/:id", async (req) => {
+  const { orgId } = getAuth(req);
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `select * from certifications where id = $1 and org_id = $2`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  return r.rows[0];
+});
+
 app.post("/certifications", async (req) => {
   const { orgId, userId, role } = getAuth(req);
   if (role === "VIEWER") throw new Error("Forbidden");
-
-  const p = CreateCertification.parse(cleanBody(req.body));
-
+  const p = CertificationSchema.parse(cleanBody(req.body));
   const r = await pool.query(
-    `insert into certifications
-      (org_id, name, framework_type, issuing_body, issue_date, expiry_date, owner_user_id, notes)
-     values
-      ($1,$2,$3,$4,$5,$6,$7,$8)
-     returning *`,
-    [
-      orgId,
-      p.name,
-      p.frameworkType ?? null,
-      p.issuingBody ?? null,
-      p.issueDate ?? null,
-      p.expiryDate ?? null,
-      userId,
-      p.notes ?? null
-    ]
+    `insert into certifications (org_id, name, framework_type, issuing_body, issue_date, expiry_date, owner_user_id, notes)
+     values ($1,$2,$3,$4,$5,$6,$7,$8) returning *`,
+    [orgId, p.name, p.frameworkType ?? null, p.issuingBody ?? null, p.issueDate ?? null, p.expiryDate ?? null, userId, p.notes ?? null]
   );
-
   await logActivity(orgId, userId, "CREATED", "CERTIFICATION", r.rows[0].id, p.name);
   return r.rows[0];
+});
+
+app.put("/certifications/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const p = CertificationSchema.partial().parse(cleanBody(req.body));
+  const fields: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (p.name !== undefined) { fields.push(`name = $${idx++}`); values.push(p.name); }
+  if (p.frameworkType !== undefined) { fields.push(`framework_type = $${idx++}`); values.push(p.frameworkType); }
+  if (p.issuingBody !== undefined) { fields.push(`issuing_body = $${idx++}`); values.push(p.issuingBody); }
+  if (p.issueDate !== undefined) { fields.push(`issue_date = $${idx++}`); values.push(p.issueDate); }
+  if (p.expiryDate !== undefined) { fields.push(`expiry_date = $${idx++}`); values.push(p.expiryDate); }
+  if (p.status !== undefined) { fields.push(`status = $${idx++}`); values.push(p.status); }
+  if (p.notes !== undefined) { fields.push(`notes = $${idx++}`); values.push(p.notes); }
+
+  if (fields.length === 0) throw new Error("No fields to update");
+  values.push(id, orgId);
+
+  const r = await pool.query(
+    `update certifications set ${fields.join(", ")} where id = $${idx++} and org_id = $${idx} returning *`,
+    values
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "UPDATED", "CERTIFICATION", id, r.rows[0].name, `Fields: ${Object.keys(p).join(", ")}`);
+  return r.rows[0];
+});
+
+app.delete("/certifications/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `delete from certifications where id = $1 and org_id = $2 returning *`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "DELETED", "CERTIFICATION", id, r.rows[0].name);
+  return { deleted: true };
 });
 
 // =======================
 // Risks
 // =======================
-const CreateRisk = z.object({
+const RiskSchema = z.object({
   title: z.string().min(2).max(200),
   description: z.string().max(5000).optional(),
   category: z.string().max(200).optional(),
@@ -189,164 +199,308 @@ const CreateRisk = z.object({
   impact: z.number().int().min(1).max(5),
   residualLikelihood: z.number().int().min(1).max(5).optional(),
   residualImpact: z.number().int().min(1).max(5).optional(),
-  status: z.enum(["OPEN", "IN_TREATMENT", "ACCEPTED", "CLOSED"]).optional(),
+  status: z.enum(["PENDING_REVIEW", "OPEN", "IN_TREATMENT", "ACCEPTED", "CLOSED", "REJECTED"]).optional(),
   treatmentPlan: z.string().max(5000).optional(),
-  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional()
+  dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  sourceType: z.enum(["MANUAL", "FINDING", "NON_CONFORMITY", "INCIDENT"]).optional(),
+  sourceId: z.string().uuid().optional(),
 });
 
 app.get("/risks", async (req) => {
   const { orgId } = getAuth(req);
   const r = await pool.query(
-    `select * from risks
-     where org_id = $1
-     order by created_at desc
-     limit 200`,
+    `select * from risks where org_id = $1 order by created_at desc limit 200`,
     [orgId]
   );
   return r.rows;
 });
 
+app.get("/risks/:id", async (req) => {
+  const { orgId } = getAuth(req);
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `select * from risks where id = $1 and org_id = $2`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  return r.rows[0];
+});
+
 app.post("/risks", async (req) => {
   const { orgId, userId, role } = getAuth(req);
   if (role === "VIEWER") throw new Error("Forbidden");
-
-  const p = CreateRisk.parse(cleanBody(req.body));
-
+  const p = RiskSchema.parse(cleanBody(req.body));
   const r = await pool.query(
     `insert into risks
       (org_id, title, description, category, likelihood, impact,
        residual_likelihood, residual_impact, status, owner_user_id,
        treatment_plan, due_date)
-     values
-      ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
-     returning *`,
-    [
-      orgId,
-      p.title,
-      p.description ?? null,
-      p.category ?? null,
-      p.likelihood,
-      p.impact,
-      p.residualLikelihood ?? null,
-      p.residualImpact ?? null,
-      p.status ?? "OPEN",
-      userId,
-      p.treatmentPlan ?? null,
-      p.dueDate ?? null
-    ]
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,
+    [orgId, p.title, p.description ?? null, p.category ?? null,
+     p.likelihood, p.impact, p.residualLikelihood ?? null, p.residualImpact ?? null,
+     p.status ?? "OPEN", userId, p.treatmentPlan ?? null, p.dueDate ?? null]
   );
-
   await logActivity(orgId, userId, "CREATED", "RISK", r.rows[0].id, p.title, `Score: ${r.rows[0].inherent_score}`);
   return r.rows[0];
+});
+
+app.put("/risks/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const p = RiskSchema.partial().parse(cleanBody(req.body));
+  const fields: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (p.title !== undefined) { fields.push(`title = $${idx++}`); values.push(p.title); }
+  if (p.description !== undefined) { fields.push(`description = $${idx++}`); values.push(p.description); }
+  if (p.category !== undefined) { fields.push(`category = $${idx++}`); values.push(p.category); }
+  if (p.likelihood !== undefined) { fields.push(`likelihood = $${idx++}`); values.push(p.likelihood); }
+  if (p.impact !== undefined) { fields.push(`impact = $${idx++}`); values.push(p.impact); }
+  if (p.residualLikelihood !== undefined) { fields.push(`residual_likelihood = $${idx++}`); values.push(p.residualLikelihood); }
+  if (p.residualImpact !== undefined) { fields.push(`residual_impact = $${idx++}`); values.push(p.residualImpact); }
+  if (p.status !== undefined) { fields.push(`status = $${idx++}`); values.push(p.status); }
+  if (p.treatmentPlan !== undefined) { fields.push(`treatment_plan = $${idx++}`); values.push(p.treatmentPlan); }
+  if (p.dueDate !== undefined) { fields.push(`due_date = $${idx++}`); values.push(p.dueDate); }
+
+  if (fields.length === 0) throw new Error("No fields to update");
+  values.push(id, orgId);
+
+  const r = await pool.query(
+    `update risks set ${fields.join(", ")} where id = $${idx++} and org_id = $${idx} returning *`,
+    values
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "UPDATED", "RISK", id, r.rows[0].title, `Fields: ${Object.keys(p).join(", ")}`);
+  return r.rows[0];
+});
+
+app.delete("/risks/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `delete from risks where id = $1 and org_id = $2 returning *`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "DELETED", "RISK", id, r.rows[0].title);
+  return { deleted: true };
 });
 
 // =======================
 // Audits
 // =======================
-const CreateAudit = z.object({
+const AuditSchema = z.object({
   type: z.enum(["INTERNAL", "EXTERNAL", "CERTIFICATION"]),
   title: z.string().min(2).max(200),
   scope: z.string().max(5000).optional(),
   auditor: z.string().max(200).optional(),
   startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  status: z.enum(["PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional()
+  status: z.enum(["PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]).optional(),
 });
 
 app.get("/audits", async (req) => {
   const { orgId } = getAuth(req);
   const r = await pool.query(
-    `select * from audits
-     where org_id = $1
-     order by created_at desc
-     limit 200`,
+    `select * from audits where org_id = $1 order by created_at desc limit 200`,
     [orgId]
   );
   return r.rows;
 });
 
-app.post("/audits", async (req) => {
-  const { orgId, role } = getAuth(req);
-  if (role === "VIEWER") throw new Error("Forbidden");
-
-  const p = CreateAudit.parse(cleanBody(req.body));
-
+app.get("/audits/:id", async (req) => {
+  const { orgId } = getAuth(req);
+  const { id } = req.params as { id: string };
   const r = await pool.query(
-    `insert into audits
-      (org_id, type, title, scope, auditor, start_date, end_date, status)
-     values
-      ($1,$2,$3,$4,$5,$6,$7,$8)
-     returning *`,
-    [
-      orgId,
-      p.type,
-      p.title,
-      p.scope ?? null,
-      p.auditor ?? null,
-      p.startDate ?? null,
-      p.endDate ?? null,
-      p.status ?? "PLANNED"
-    ]
+    `select * from audits where id = $1 and org_id = $2`,
+    [id, orgId]
   );
+  if (r.rows.length === 0) throw new Error("Not found");
+  return r.rows[0];
+});
 
-  const { userId } = getAuth(req);
+app.post("/audits", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const p = AuditSchema.parse(cleanBody(req.body));
+  const r = await pool.query(
+    `insert into audits (org_id, type, title, scope, auditor, start_date, end_date, status)
+     values ($1,$2,$3,$4,$5,$6,$7,$8) returning *`,
+    [orgId, p.type, p.title, p.scope ?? null, p.auditor ?? null, p.startDate ?? null, p.endDate ?? null, p.status ?? "PLANNED"]
+  );
   await logActivity(orgId, userId, "CREATED", "AUDIT", r.rows[0].id, p.title, `Type: ${p.type}`);
   return r.rows[0];
+});
+
+app.put("/audits/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const p = AuditSchema.partial().parse(cleanBody(req.body));
+  const fields: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (p.type !== undefined) { fields.push(`type = $${idx++}`); values.push(p.type); }
+  if (p.title !== undefined) { fields.push(`title = $${idx++}`); values.push(p.title); }
+  if (p.scope !== undefined) { fields.push(`scope = $${idx++}`); values.push(p.scope); }
+  if (p.auditor !== undefined) { fields.push(`auditor = $${idx++}`); values.push(p.auditor); }
+  if (p.startDate !== undefined) { fields.push(`start_date = $${idx++}`); values.push(p.startDate); }
+  if (p.endDate !== undefined) { fields.push(`end_date = $${idx++}`); values.push(p.endDate); }
+  if (p.status !== undefined) { fields.push(`status = $${idx++}`); values.push(p.status); }
+
+  if (fields.length === 0) throw new Error("No fields to update");
+  values.push(id, orgId);
+
+  const r = await pool.query(
+    `update audits set ${fields.join(", ")} where id = $${idx++} and org_id = $${idx} returning *`,
+    values
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "UPDATED", "AUDIT", id, r.rows[0].title, `Fields: ${Object.keys(p).join(", ")}`);
+  return r.rows[0];
+});
+
+app.delete("/audits/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `delete from audits where id = $1 and org_id = $2 returning *`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "DELETED", "AUDIT", id, r.rows[0].title);
+  return { deleted: true };
 });
 
 // =======================
 // Findings
 // =======================
-const CreateFinding = z.object({
+const FindingSchema = z.object({
   auditId: z.string().uuid(),
   title: z.string().min(2).max(200),
   description: z.string().max(5000).optional(),
   severity: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]),
   recommendation: z.string().max(5000).optional(),
   dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "ACCEPTED"]).optional()
+  status: z.enum(["OPEN", "IN_PROGRESS", "RESOLVED", "ACCEPTED"]).optional(),
 });
 
 app.get("/audits/:id/findings", async (req) => {
   const { orgId } = getAuth(req);
   const auditId = (req.params as any).id as string;
-
   const r = await pool.query(
-    `select * from audit_findings
-     where org_id = $1 and audit_id = $2
-     order by created_at desc`,
+    `select * from audit_findings where org_id = $1 and audit_id = $2 order by created_at desc`,
     [orgId, auditId]
   );
-
   return r.rows;
+});
+
+app.get("/findings/:id", async (req) => {
+  const { orgId } = getAuth(req);
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `select * from audit_findings where id = $1 and org_id = $2`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  return r.rows[0];
 });
 
 app.post("/findings", async (req) => {
   const { orgId, userId, role } = getAuth(req);
   if (role === "VIEWER") throw new Error("Forbidden");
-
-  const p = CreateFinding.parse(cleanBody(req.body));
-
+  const p = FindingSchema.parse(cleanBody(req.body));
   const r = await pool.query(
     `insert into audit_findings
       (org_id, audit_id, title, description, severity, recommendation, owner_user_id, due_date, status)
-     values
-      ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-     returning *`,
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9) returning *`,
+    [orgId, p.auditId, p.title, p.description ?? null, p.severity, p.recommendation ?? null, userId, p.dueDate ?? null, p.status ?? "OPEN"]
+  );
+  await logActivity(orgId, userId, "CREATED", "FINDING", r.rows[0].id, p.title, `Severity: ${p.severity}`);
+  return r.rows[0];
+});
+
+app.put("/findings/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const p = FindingSchema.partial().parse(cleanBody(req.body));
+  const fields: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (p.title !== undefined) { fields.push(`title = $${idx++}`); values.push(p.title); }
+  if (p.description !== undefined) { fields.push(`description = $${idx++}`); values.push(p.description); }
+  if (p.severity !== undefined) { fields.push(`severity = $${idx++}`); values.push(p.severity); }
+  if (p.recommendation !== undefined) { fields.push(`recommendation = $${idx++}`); values.push(p.recommendation); }
+  if (p.dueDate !== undefined) { fields.push(`due_date = $${idx++}`); values.push(p.dueDate); }
+  if (p.status !== undefined) { fields.push(`status = $${idx++}`); values.push(p.status); }
+
+  if (fields.length === 0) throw new Error("No fields to update");
+  values.push(id, orgId);
+
+  const r = await pool.query(
+    `update audit_findings set ${fields.join(", ")} where id = $${idx++} and org_id = $${idx} returning *`,
+    values
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "UPDATED", "FINDING", id, r.rows[0].title, `Fields: ${Object.keys(p).join(", ")}`);
+  return r.rows[0];
+});
+
+app.delete("/findings/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `delete from audit_findings where id = $1 and org_id = $2 returning *`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "DELETED", "FINDING", id, r.rows[0].title);
+  return { deleted: true };
+});
+
+// Send finding to risk register
+app.post("/findings/:id/send-to-risk", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+
+  // Get the finding
+  const f = await pool.query(
+    `select * from audit_findings where id = $1 and org_id = $2`,
+    [id, orgId]
+  );
+  if (f.rows.length === 0) throw new Error("Finding not found");
+  const finding = f.rows[0];
+
+  // Map severity to likelihood/impact
+  const severityMap: Record<string, number> = { LOW: 2, MEDIUM: 3, HIGH: 4, CRITICAL: 5 };
+  const score = severityMap[finding.severity] ?? 3;
+
+  // Create risk with PENDING_REVIEW status
+  const r = await pool.query(
+    `insert into risks
+      (org_id, title, description, category, likelihood, impact, status, owner_user_id, treatment_plan)
+     values ($1, $2, $3, $4, $5, $6, 'PENDING_REVIEW', $7, $8) returning *`,
     [
       orgId,
-      p.auditId,
-      p.title,
-      p.description ?? null,
-      p.severity,
-      p.recommendation ?? null,
+      `[From Finding] ${finding.title}`,
+      finding.description || `Originated from audit finding: ${finding.title}`,
+      "Audit Finding",
+      score, score,
       userId,
-      p.dueDate ?? null,
-      p.status ?? "OPEN"
+      finding.recommendation || null,
     ]
   );
 
-  await logActivity(orgId, userId, "CREATED", "FINDING", r.rows[0].id, p.title, `Severity: ${p.severity}`);
+  await logActivity(orgId, userId, "SENT_TO_RISK", "FINDING", id, finding.title, `Created Risk: ${r.rows[0].id}`);
   return r.rows[0];
 });
 
@@ -358,25 +512,17 @@ app.post("/auth/sync", async (req) => {
   const email = String(req.headers["x-clerk-email"] ?? "");
   const fullName = String(req.headers["x-clerk-name"] ?? "");
 
-  if (!clerkUserId || !email) {
-    throw new Error("Missing clerk user info");
-  }
+  if (!clerkUserId || !email) throw new Error("Missing clerk user info");
 
   const existing = await pool.query(
     `SELECT u.id as user_id, m.org_id, m.role
-     FROM users u
-     JOIN memberships m ON m.user_id = u.id
-     WHERE u.cognito_sub = $1
-     LIMIT 1`,
+     FROM users u JOIN memberships m ON m.user_id = u.id
+     WHERE u.cognito_sub = $1 LIMIT 1`,
     [clerkUserId]
   );
 
   if (existing.rows.length > 0) {
-    return {
-      userId: existing.rows[0].user_id,
-      orgId: existing.rows[0].org_id,
-      role: existing.rows[0].role
-    };
+    return { userId: existing.rows[0].user_id, orgId: existing.rows[0].org_id, role: existing.rows[0].role };
   }
 
   const orgResult = await pool.query(
@@ -411,9 +557,7 @@ app.post("/evidence/upload", async (req) => {
   const entityType = query.entityType ?? "";
   const entityId = query.entityId ?? "";
 
-  if (!["CERTIFICATION", "RISK", "AUDIT", "FINDING"].includes(entityType)) {
-    throw new Error("Invalid entity type");
-  }
+  if (!["CERTIFICATION", "RISK", "AUDIT", "FINDING"].includes(entityType)) throw new Error("Invalid entity type");
   if (!entityId) throw new Error("Missing entity ID");
 
   const data = await req.file();
@@ -423,7 +567,6 @@ app.post("/evidence/upload", async (req) => {
   const fileName = data.filename;
   const mimeType = data.mimetype;
   const fileSize = buffer.length;
-
   const storageKey = `${orgId}/${entityType}/${entityId}/${Date.now()}-${fileName}`;
   const filePath = join(UPLOAD_DIR, storageKey);
 
@@ -431,13 +574,10 @@ app.post("/evidence/upload", async (req) => {
   await writeFile(filePath, buffer);
 
   const r = await pool.query(
-    `INSERT INTO evidence_files
-      (org_id, entity_type, entity_id, file_name, mime_type, file_size, s3_key, uploaded_by)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-     RETURNING *`,
+    `INSERT INTO evidence_files (org_id, entity_type, entity_id, file_name, mime_type, file_size, s3_key, uploaded_by)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *`,
     [orgId, entityType, entityId, fileName, mimeType, fileSize, storageKey, userId]
   );
-
   await logActivity(orgId, userId, "UPLOADED", "EVIDENCE", r.rows[0].id, fileName, `For ${entityType} ${entityId}`);
   return r.rows[0];
 });
@@ -445,33 +585,26 @@ app.post("/evidence/upload", async (req) => {
 app.get("/evidence/:entityType/:entityId", async (req) => {
   const { orgId } = getAuth(req);
   const { entityType, entityId } = req.params as { entityType: string; entityId: string };
-
   const r = await pool.query(
     `SELECT id, file_name, mime_type, file_size, uploaded_at
-     FROM evidence_files
-     WHERE org_id = $1 AND entity_type = $2 AND entity_id = $3
+     FROM evidence_files WHERE org_id = $1 AND entity_type = $2 AND entity_id = $3
      ORDER BY uploaded_at DESC`,
     [orgId, entityType.toUpperCase(), entityId]
   );
-
   return r.rows;
 });
 
 app.get("/evidence/download/:fileId", async (req, reply) => {
   const { orgId } = getAuth(req);
   const { fileId } = req.params as { fileId: string };
-
   const r = await pool.query(
     `SELECT * FROM evidence_files WHERE id = $1 AND org_id = $2`,
     [fileId, orgId]
   );
-
   if (r.rows.length === 0) throw new Error("File not found");
-
   const file = r.rows[0];
   const filePath = join(UPLOAD_DIR, file.s3_key);
   const buffer = await readFile(filePath);
-
   reply
     .header("Content-Type", file.mime_type || "application/octet-stream")
     .header("Content-Disposition", `attachment; filename="${file.file_name}"`)
@@ -479,19 +612,14 @@ app.get("/evidence/download/:fileId", async (req, reply) => {
 });
 
 app.delete("/evidence/:fileId", async (req) => {
-  const { orgId, role } = getAuth(req);
+  const { orgId, userId, role } = getAuth(req);
   if (role === "VIEWER") throw new Error("Forbidden");
-
   const { fileId } = req.params as { fileId: string };
-
   const r = await pool.query(
     `DELETE FROM evidence_files WHERE id = $1 AND org_id = $2 RETURNING *`,
     [fileId, orgId]
   );
-
   if (r.rows.length === 0) throw new Error("File not found");
-
-  const { userId } = getAuth(req);
   await logActivity(orgId, userId, "DELETED", "EVIDENCE", fileId, r.rows[0].file_name);
   return { deleted: true };
 });
@@ -501,17 +629,26 @@ app.delete("/evidence/:fileId", async (req) => {
 // =======================
 app.get("/activity", async (req) => {
   const { orgId } = getAuth(req);
-
   const r = await pool.query(
     `SELECT a.*, u.full_name, u.email
-     FROM activity_log a
-     LEFT JOIN users u ON u.id = a.actor_user_id
-     WHERE a.org_id = $1
-     ORDER BY a.created_at DESC
-     LIMIT 100`,
+     FROM activity_log a LEFT JOIN users u ON u.id = a.actor_user_id
+     WHERE a.org_id = $1 ORDER BY a.created_at DESC LIMIT 100`,
     [orgId]
   );
+  return r.rows;
+});
 
+// Entity-specific activity
+app.get("/activity/:entityType/:entityId", async (req) => {
+  const { orgId } = getAuth(req);
+  const { entityType, entityId } = req.params as { entityType: string; entityId: string };
+  const r = await pool.query(
+    `SELECT a.*, u.full_name, u.email
+     FROM activity_log a LEFT JOIN users u ON u.id = a.actor_user_id
+     WHERE a.org_id = $1 AND a.entity_type = $2 AND a.entity_id = $3
+     ORDER BY a.created_at DESC LIMIT 50`,
+    [orgId, entityType.toUpperCase(), entityId]
+  );
   return r.rows;
 });
 
@@ -532,15 +669,10 @@ app.post("/alerts/digest", async (req) => {
   return { ok: true, message: "Weekly digest sent" };
 });
 
-setInterval(() => {
-  runAllAlerts().catch(console.error);
-}, 24 * 60 * 60 * 1000);
-
+setInterval(() => { runAllAlerts().catch(console.error); }, 24 * 60 * 60 * 1000);
 setInterval(() => {
   const now = new Date();
-  if (now.getDay() === 1 && now.getHours() === 8) {
-    sendWeeklyDigest().catch(console.error);
-  }
+  if (now.getDay() === 1 && now.getHours() === 8) sendWeeklyDigest().catch(console.error);
 }, 60 * 60 * 1000);
 
 // --- Error handler ---
@@ -550,10 +682,6 @@ app.setErrorHandler((err, _req, reply) => {
 });
 
 const port = Number(process.env.PORT ?? 4000);
-
 app.listen({ port, host: "0.0.0.0" })
   .then(() => console.log(`API running on http://localhost:${port}`))
-  .catch((err) => {
-    app.log.error(err);
-    process.exit(1);
-  });
+  .catch((err) => { app.log.error(err); process.exit(1); });
