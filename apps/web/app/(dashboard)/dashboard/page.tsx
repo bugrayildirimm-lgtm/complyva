@@ -67,6 +67,13 @@ export default async function DashboardPage() {
           <h1 className="page-title">Compliance Dashboard</h1>
           <p className="page-subtitle">Real-time compliance posture across all registers</p>
         </div>
+        <a
+          href="/api/report"
+          className="btn btn-secondary"
+          style={{ padding: "6px 14px", fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
+        >
+          ↓ Download PDF Report
+        </a>
       </div>
 
       {/* Alerts */}
