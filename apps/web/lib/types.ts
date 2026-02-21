@@ -89,6 +89,29 @@ export type Asset = {
   updated_at: string;
 };
 
+export type Incident = {
+  id: string;
+  org_id: string;
+  title: string;
+  description: string | null;
+  incident_date: string | null;
+  detected_date: string | null;
+  category: string | null;
+  severity: string;
+  asset_id: string | null;
+  asset_name: string | null;
+  root_cause: string | null;
+  immediate_action: string | null;
+  corrective_action: string | null;
+  reported_by: string | null;
+  assigned_to: string | null;
+  status: string;
+  resolved_date: string | null;
+  owner_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ActivityLog = {
   id: string;
   action: string;

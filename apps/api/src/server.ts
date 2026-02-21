@@ -41,6 +41,7 @@ app.get("/", async () => ({
     "/alerts/run (POST)",
     "/alerts/digest (POST)",
     "/assets (GET, POST, PUT, DELETE)",
+    "/incidents (GET, POST, PUT, DELETE)",
     "/activity (GET)",
   ],
 }));
@@ -745,6 +746,126 @@ app.delete("/assets/:id", async (req) => {
   );
   if (r.rows.length === 0) throw new Error("Not found");
   await logActivity(orgId, userId, "DELETED", "ASSET", id, r.rows[0].name);
+  return { deleted: true };
+});
+
+// =======================
+// Incidents
+// =======================
+const IncidentSchema = z.object({
+  title: z.string().min(2).max(300),
+  description: z.string().max(5000).optional(),
+  incidentDate: z.string().optional(),
+  detectedDate: z.string().optional(),
+  category: z.string().max(100).optional(),
+  severity: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+  assetId: z.string().uuid().optional(),
+  rootCause: z.string().max(5000).optional(),
+  immediateAction: z.string().max(5000).optional(),
+  correctiveAction: z.string().max(5000).optional(),
+  reportedBy: z.string().max(200).optional(),
+  assignedTo: z.string().max(200).optional(),
+  status: z.enum(["OPEN", "INVESTIGATING", "CONTAINED", "RESOLVED", "CLOSED"]).optional(),
+  resolvedDate: z.string().optional(),
+});
+
+app.get("/incidents", async (req) => {
+  const { orgId } = getAuth(req);
+  const r = await pool.query(
+    `SELECT i.*, a.name as asset_name FROM incidents i LEFT JOIN assets a ON a.id = i.asset_id WHERE i.org_id = $1 ORDER BY i.created_at DESC LIMIT 200`,
+    [orgId]
+  );
+  return r.rows;
+});
+
+app.get("/incidents/:id", async (req) => {
+  const { orgId } = getAuth(req);
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `SELECT i.*, a.name as asset_name FROM incidents i LEFT JOIN assets a ON a.id = i.asset_id WHERE i.id = $1 AND i.org_id = $2`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  return r.rows[0];
+});
+
+app.post("/incidents", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const p = IncidentSchema.parse(cleanBody(req.body));
+  const r = await pool.query(
+    `INSERT INTO incidents (org_id, title, description, incident_date, detected_date, category, severity, asset_id, root_cause, immediate_action, corrective_action, reported_by, assigned_to, status, owner_user_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+    [orgId, p.title, p.description ?? null, p.incidentDate ?? null, p.detectedDate ?? null,
+     p.category ?? null, p.severity ?? "MEDIUM", p.assetId ?? null,
+     p.rootCause ?? null, p.immediateAction ?? null, p.correctiveAction ?? null,
+     p.reportedBy ?? null, p.assignedTo ?? null, p.status ?? "OPEN", userId]
+  );
+  await logActivity(orgId, userId, "CREATED", "INCIDENT", r.rows[0].id, p.title, `Severity: ${p.severity ?? "MEDIUM"}`);
+  return r.rows[0];
+});
+
+app.put("/incidents/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const p = IncidentSchema.partial().parse(cleanBody(req.body));
+  const fields: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (p.title !== undefined) { fields.push(`title = $${idx++}`); values.push(p.title); }
+  if (p.description !== undefined) { fields.push(`description = $${idx++}`); values.push(p.description); }
+  if (p.incidentDate !== undefined) { fields.push(`incident_date = $${idx++}`); values.push(p.incidentDate); }
+  if (p.detectedDate !== undefined) { fields.push(`detected_date = $${idx++}`); values.push(p.detectedDate); }
+  if (p.category !== undefined) { fields.push(`category = $${idx++}`); values.push(p.category); }
+  if (p.severity !== undefined) { fields.push(`severity = $${idx++}`); values.push(p.severity); }
+  if (p.assetId !== undefined) { fields.push(`asset_id = $${idx++}`); values.push(p.assetId); }
+  if (p.rootCause !== undefined) { fields.push(`root_cause = $${idx++}`); values.push(p.rootCause); }
+  if (p.immediateAction !== undefined) { fields.push(`immediate_action = $${idx++}`); values.push(p.immediateAction); }
+  if (p.correctiveAction !== undefined) { fields.push(`corrective_action = $${idx++}`); values.push(p.correctiveAction); }
+  if (p.reportedBy !== undefined) { fields.push(`reported_by = $${idx++}`); values.push(p.reportedBy); }
+  if (p.assignedTo !== undefined) { fields.push(`assigned_to = $${idx++}`); values.push(p.assignedTo); }
+  if (p.status !== undefined) { fields.push(`status = $${idx++}`); values.push(p.status); }
+  if (p.resolvedDate !== undefined) { fields.push(`resolved_date = $${idx++}`); values.push(p.resolvedDate); }
+
+  if (fields.length === 0) throw new Error("No fields to update");
+  fields.push(`updated_at = now()`);
+  values.push(id, orgId);
+
+  const r = await pool.query(
+    `UPDATE incidents SET ${fields.join(", ")} WHERE id = $${idx++} AND org_id = $${idx} RETURNING *`,
+    values
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "UPDATED", "INCIDENT", id, r.rows[0].title, `Fields: ${Object.keys(p).join(", ")}`);
+  return r.rows[0];
+});
+
+app.post("/incidents/:id/send-to-risk", async (req) => {
+  const { orgId, userId } = getAuth(req);
+  const { id } = req.params as { id: string };
+  const inc = await pool.query(`SELECT * FROM incidents WHERE id = $1 AND org_id = $2`, [id, orgId]);
+  if (inc.rows.length === 0) throw new Error("Not found");
+  const i = inc.rows[0];
+  const r = await pool.query(
+    `INSERT INTO risks (org_id, title, category, likelihood, impact, status, treatment_plan, owner_user_id)
+     VALUES ($1,$2,$3,3,3,'PENDING_REVIEW',$4,$5) RETURNING *`,
+    [orgId, `[From Incident] ${i.title}`, i.category ?? "Incident", `Root cause: ${i.root_cause ?? "TBD"}. Corrective action: ${i.corrective_action ?? "TBD"}`, userId]
+  );
+  await logActivity(orgId, userId, "SENT_TO_RISK", "INCIDENT", id, i.title, `Risk ID: ${r.rows[0].id}`);
+  return r.rows[0];
+});
+app.delete("/incidents/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `DELETE FROM incidents WHERE id = $1 AND org_id = $2 RETURNING *`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "DELETED", "INCIDENT", id, r.rows[0].title);
   return { deleted: true };
 });
 

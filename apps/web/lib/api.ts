@@ -327,6 +327,70 @@ export async function deleteAsset(id: string) {
   revalidatePath("/dashboard");
 }
 
+// ========== Incidents ==========
+export async function getIncidents() {
+  return apiFetch("/incidents");
+}
+
+export async function getIncident(id: string) {
+  return apiFetch(`/incidents/${id}`);
+}
+
+export async function createIncident(formData: FormData) {
+  "use server";
+  const title = String(formData.get("title") ?? "").trim();
+  if (title.length < 2) { redirect("/incidents"); return; }
+
+  await apiFetch("/incidents", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title,
+      description: str(formData, "description"),
+      incidentDate: str(formData, "incidentDate"),
+      detectedDate: str(formData, "detectedDate"),
+      category: str(formData, "category"),
+      severity: String(formData.get("severity") ?? "MEDIUM"),
+      assetId: str(formData, "assetId") || undefined,
+      reportedBy: str(formData, "reportedBy"),
+      assignedTo: str(formData, "assignedTo"),
+    }),
+  });
+
+  revalidatePath("/incidents");
+  revalidatePath("/dashboard");
+}
+
+export async function updateIncident(id: string, data: Record<string, any>) {
+  "use server";
+  await apiFetch(`/incidents/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  revalidatePath(`/incidents/${id}`);
+  revalidatePath("/incidents");
+  revalidatePath("/dashboard");
+}
+
+export async function sendIncidentToRisk(incidentId: string) {
+  "use server";
+  const result = await apiFetch(`/incidents/${incidentId}/send-to-risk`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  revalidatePath("/risks");
+  revalidatePath("/incidents");
+  return result;
+}
+export async function deleteIncident(id: string) {
+  "use server";
+  await apiFetch(`/incidents/${id}`, { method: "DELETE" });
+  revalidatePath("/incidents");
+  revalidatePath("/dashboard");
+}
+
 // ========== Evidence Files ==========
 export async function uploadEvidence(entityType: string, entityId: string, formData: FormData) {
   "use server";
