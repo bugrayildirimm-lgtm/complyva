@@ -44,6 +44,7 @@ app.get("/", async () => ({
     "/incidents (GET, POST, PUT, DELETE)",
     "/changes (GET, POST, PUT, DELETE)",
     "/nonconformities (GET, POST, PUT, DELETE)",
+    "/capas (GET, POST, PUT, DELETE)",
     "/activity (GET)",
   ],
 }));
@@ -1069,6 +1070,132 @@ app.delete("/nonconformities/:id", async (req) => {
   );
   if (r.rows.length === 0) throw new Error("Not found");
   await logActivity(orgId, userId, "DELETED", "NC", id, r.rows[0].title);
+  return { deleted: true };
+});
+
+// =======================
+// CAPAs
+// =======================
+const CAPASchema = z.object({
+  title: z.string().min(2).max(300),
+  description: z.string().max(5000).optional(),
+  capaType: z.enum(["CORRECTIVE", "PREVENTIVE", "CORRECTION"]).optional(),
+  sourceType: z.string().max(50).optional(),
+  sourceRefId: z.string().uuid().optional(),
+  assetId: z.string().uuid().optional(),
+  rootCause: z.string().max(5000).optional(),
+  rootCauseCategory: z.enum(["PEOPLE", "PROCESS", "TECHNOLOGY", "THIRD_PARTY", "EXTERNAL_REGULATORY"]).optional(),
+  analysisMethod: z.enum(["FIVE_WHYS", "FISHBONE", "FAULT_TREE", "TREND_ANALYSIS"]).optional(),
+  actionPlan: z.string().max(5000).optional(),
+  verificationMethod: z.string().max(5000).optional(),
+  effectivenessReview: z.string().max(5000).optional(),
+  effectivenessStatus: z.enum(["EFFECTIVE", "PARTIALLY_EFFECTIVE", "NOT_EFFECTIVE"]).optional(),
+  raisedBy: z.string().max(200).optional(),
+  assignedTo: z.string().max(200).optional(),
+  verifiedBy: z.string().max(200).optional(),
+  closureApprovedBy: z.string().max(200).optional(),
+  closureComments: z.string().max(5000).optional(),
+  dueDate: z.string().optional(),
+  completedDate: z.string().optional(),
+  verifiedDate: z.string().optional(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+  status: z.enum(["OPEN", "UNDER_INVESTIGATION", "ACTION_DEFINED", "IN_PROGRESS", "PENDING_VERIFICATION", "CLOSED", "REOPENED"]).optional(),
+});
+
+app.get("/capas", async (req) => {
+  const { orgId } = getAuth(req);
+  const r = await pool.query(
+    `SELECT c.*, a.name as asset_name FROM capas c LEFT JOIN assets a ON a.id = c.asset_id WHERE c.org_id = $1 ORDER BY c.created_at DESC LIMIT 200`,
+    [orgId]
+  );
+  return r.rows;
+});
+
+app.get("/capas/:id", async (req) => {
+  const { orgId } = getAuth(req);
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `SELECT c.*, a.name as asset_name FROM capas c LEFT JOIN assets a ON a.id = c.asset_id WHERE c.id = $1 AND c.org_id = $2`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  return r.rows[0];
+});
+
+app.post("/capas", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const p = CAPASchema.parse(cleanBody(req.body));
+  const r = await pool.query(
+    `INSERT INTO capas (org_id, title, description, capa_type, source_type, source_ref_id, asset_id, root_cause, root_cause_category, analysis_method, action_plan, verification_method, raised_by, assigned_to, due_date, priority, status, owner_user_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING *`,
+    [orgId, p.title, p.description ?? null, p.capaType ?? "CORRECTIVE",
+     p.sourceType ?? null, p.sourceRefId ?? null, p.assetId ?? null,
+     p.rootCause ?? null, p.rootCauseCategory ?? null, p.analysisMethod ?? null,
+     p.actionPlan ?? null, p.verificationMethod ?? null,
+     p.raisedBy ?? null, p.assignedTo ?? null, p.dueDate ?? null,
+     p.priority ?? "MEDIUM", p.status ?? "OPEN", userId]
+  );
+  await logActivity(orgId, userId, "CREATED", "CAPA", r.rows[0].id, p.title, `Type: ${p.capaType ?? "CORRECTIVE"}`);
+  return r.rows[0];
+});
+
+app.put("/capas/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const p = CAPASchema.partial().parse(cleanBody(req.body));
+  const fields: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (p.title !== undefined) { fields.push(`title = $${idx++}`); values.push(p.title); }
+  if (p.description !== undefined) { fields.push(`description = $${idx++}`); values.push(p.description); }
+  if (p.capaType !== undefined) { fields.push(`capa_type = $${idx++}`); values.push(p.capaType); }
+  if (p.sourceType !== undefined) { fields.push(`source_type = $${idx++}`); values.push(p.sourceType); }
+  if (p.sourceRefId !== undefined) { fields.push(`source_ref_id = $${idx++}`); values.push(p.sourceRefId); }
+  if (p.assetId !== undefined) { fields.push(`asset_id = $${idx++}`); values.push(p.assetId); }
+  if (p.rootCause !== undefined) { fields.push(`root_cause = $${idx++}`); values.push(p.rootCause); }
+  if (p.rootCauseCategory !== undefined) { fields.push(`root_cause_category = $${idx++}`); values.push(p.rootCauseCategory); }
+  if (p.analysisMethod !== undefined) { fields.push(`analysis_method = $${idx++}`); values.push(p.analysisMethod); }
+  if (p.actionPlan !== undefined) { fields.push(`action_plan = $${idx++}`); values.push(p.actionPlan); }
+  if (p.verificationMethod !== undefined) { fields.push(`verification_method = $${idx++}`); values.push(p.verificationMethod); }
+  if (p.effectivenessReview !== undefined) { fields.push(`effectiveness_review = $${idx++}`); values.push(p.effectivenessReview); }
+  if (p.effectivenessStatus !== undefined) { fields.push(`effectiveness_status = $${idx++}`); values.push(p.effectivenessStatus); }
+  if (p.raisedBy !== undefined) { fields.push(`raised_by = $${idx++}`); values.push(p.raisedBy); }
+  if (p.assignedTo !== undefined) { fields.push(`assigned_to = $${idx++}`); values.push(p.assignedTo); }
+  if (p.verifiedBy !== undefined) { fields.push(`verified_by = $${idx++}`); values.push(p.verifiedBy); }
+  if (p.closureApprovedBy !== undefined) { fields.push(`closure_approved_by = $${idx++}`); values.push(p.closureApprovedBy); }
+  if (p.closureComments !== undefined) { fields.push(`closure_comments = $${idx++}`); values.push(p.closureComments); }
+  if (p.dueDate !== undefined) { fields.push(`due_date = $${idx++}`); values.push(p.dueDate); }
+  if (p.completedDate !== undefined) { fields.push(`completed_date = $${idx++}`); values.push(p.completedDate); }
+  if (p.verifiedDate !== undefined) { fields.push(`verified_date = $${idx++}`); values.push(p.verifiedDate); }
+  if (p.priority !== undefined) { fields.push(`priority = $${idx++}`); values.push(p.priority); }
+  if (p.status !== undefined) { fields.push(`status = $${idx++}`); values.push(p.status); }
+
+  if (fields.length === 0) throw new Error("No fields to update");
+  fields.push(`updated_at = now()`);
+  values.push(id, orgId);
+
+  const r = await pool.query(
+    `UPDATE capas SET ${fields.join(", ")} WHERE id = $${idx++} AND org_id = $${idx} RETURNING *`,
+    values
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "UPDATED", "CAPA", id, r.rows[0].title, `Fields: ${Object.keys(p).join(", ")}`);
+  return r.rows[0];
+});
+
+app.delete("/capas/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `DELETE FROM capas WHERE id = $1 AND org_id = $2 RETURNING *`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "DELETED", "CAPA", id, r.rows[0].title);
   return { deleted: true };
 });
 

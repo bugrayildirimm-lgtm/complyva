@@ -161,6 +161,39 @@ export type NonConformity = {
   updated_at: string;
 };
 
+export type CAPA = {
+  id: string;
+  org_id: string;
+  capa_number: number;
+  title: string;
+  description: string | null;
+  capa_type: string;
+  source_type: string | null;
+  source_ref_id: string | null;
+  asset_id: string | null;
+  asset_name: string | null;
+  root_cause: string | null;
+  root_cause_category: string | null;
+  analysis_method: string | null;
+  action_plan: string | null;
+  verification_method: string | null;
+  effectiveness_review: string | null;
+  effectiveness_status: string | null;
+  raised_by: string | null;
+  assigned_to: string | null;
+  verified_by: string | null;
+  closure_approved_by: string | null;
+  closure_comments: string | null;
+  due_date: string | null;
+  completed_date: string | null;
+  verified_date: string | null;
+  priority: string;
+  status: string;
+  owner_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ActivityLog = {
   id: string;
   action: string;

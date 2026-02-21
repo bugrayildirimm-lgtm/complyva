@@ -384,6 +384,7 @@ export async function sendIncidentToRisk(incidentId: string) {
   revalidatePath("/incidents");
   return result;
 }
+
 export async function deleteIncident(id: string) {
   "use server";
   await apiFetch(`/incidents/${id}`, { method: "DELETE" });
@@ -494,6 +495,62 @@ export async function deleteNonConformity(id: string) {
   "use server";
   await apiFetch(`/nonconformities/${id}`, { method: "DELETE" });
   revalidatePath("/nonconformities");
+  revalidatePath("/dashboard");
+}
+
+// ========== CAPAs ==========
+export async function getCAPAs() {
+  return apiFetch("/capas");
+}
+
+export async function getCAPA(id: string) {
+  return apiFetch(`/capas/${id}`);
+}
+
+export async function createCAPA(formData: FormData) {
+  "use server";
+  const title = String(formData.get("title") ?? "").trim();
+  if (title.length < 2) { redirect("/capas"); return; }
+
+  await apiFetch("/capas", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title,
+      description: str(formData, "description"),
+      capaType: String(formData.get("capaType") ?? "CORRECTIVE"),
+      sourceType: str(formData, "sourceType") || undefined,
+      rootCauseCategory: str(formData, "rootCauseCategory") || undefined,
+      analysisMethod: str(formData, "analysisMethod") || undefined,
+      priority: String(formData.get("priority") ?? "MEDIUM"),
+      assetId: str(formData, "assetId") || undefined,
+      actionPlan: str(formData, "actionPlan"),
+      raisedBy: str(formData, "raisedBy"),
+      assignedTo: str(formData, "assignedTo"),
+      dueDate: str(formData, "dueDate"),
+    }),
+  });
+
+  revalidatePath("/capas");
+  revalidatePath("/dashboard");
+}
+
+export async function updateCAPA(id: string, data: Record<string, any>) {
+  "use server";
+  await apiFetch(`/capas/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  revalidatePath(`/capas/${id}`);
+  revalidatePath("/capas");
+  revalidatePath("/dashboard");
+}
+
+export async function deleteCAPA(id: string) {
+  "use server";
+  await apiFetch(`/capas/${id}`, { method: "DELETE" });
+  revalidatePath("/capas");
   revalidatePath("/dashboard");
 }
 

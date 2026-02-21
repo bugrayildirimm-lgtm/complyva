@@ -29,7 +29,7 @@ async function getAuthHeaders() {
 
 export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type");
-  if (!type || !["certifications", "risks", "audits", "assets", "incidents", "changes", "nonconformities"].includes(type)) {
+  if (!type || !["certifications", "risks", "audits", "assets", "incidents", "changes", "nonconformities", "capas"].includes(type)) {
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   }
 
@@ -120,6 +120,20 @@ export async function GET(req: NextRequest) {
         r.due_date ? String(r.due_date).slice(0, 10) : "",
         esc(r.root_cause), esc(r.containment_action),
         r.closed_date ? String(r.closed_date).slice(0, 10) : "",
+        String(r.created_at).slice(0, 10),
+      ].join(",") + "\n";
+    }
+  } else if (type === "capas") {
+    csvContent = "Title,Type,Priority,Source,Linked Asset,Status,Raised By,Assigned To,Due Date,Root Cause,Action Plan,Verification Method,Effectiveness Review,Verified By,Completed Date,Verified Date,Created At\n";
+    for (const r of rows) {
+      csvContent += [
+        esc(r.title), r.capa_type, r.priority, esc(r.source_type), esc(r.asset_name),
+        r.status, esc(r.raised_by), esc(r.assigned_to),
+        r.due_date ? String(r.due_date).slice(0, 10) : "",
+        esc(r.root_cause), esc(r.action_plan), esc(r.verification_method),
+        esc(r.effectiveness_review), esc(r.verified_by),
+        r.completed_date ? String(r.completed_date).slice(0, 10) : "",
+        r.verified_date ? String(r.verified_date).slice(0, 10) : "",
         String(r.created_at).slice(0, 10),
       ].join(",") + "\n";
     }
