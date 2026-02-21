@@ -202,6 +202,8 @@ const RiskSchema = z.object({
   category: z.string().max(200).optional(),
   likelihood: z.number().int().min(1).max(5),
   impact: z.number().int().min(1).max(5),
+  frequency: z.number().int().min(1).max(4).optional(),
+  controlEffectiveness: z.number().int().min(1).max(4).optional(),
   residualLikelihood: z.number().int().min(1).max(5).optional(),
   residualImpact: z.number().int().min(1).max(5).optional(),
   status: z.enum(["PENDING_REVIEW", "OPEN", "IN_TREATMENT", "ACCEPTED", "CLOSED", "REJECTED"]).optional(),
@@ -235,17 +237,20 @@ app.post("/risks", async (req) => {
   const { orgId, userId, role } = getAuth(req);
   if (role === "VIEWER") throw new Error("Forbidden");
   const p = RiskSchema.parse(cleanBody(req.body));
+  const inherentScore = p.likelihood * p.impact;
+  const residualScore = (p.residualLikelihood && p.residualImpact) ? p.residualLikelihood * p.residualImpact : null;
   const r = await pool.query(
     `insert into risks
-      (org_id, title, description, category, likelihood, impact,
-       residual_likelihood, residual_impact, status, owner_user_id,
-       treatment_plan, due_date)
-     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) returning *`,
+      (org_id, title, description, category, likelihood, impact, frequency, control_effectiveness,
+       inherent_score, residual_likelihood, residual_impact, residual_score,
+       status, owner_user_id, treatment_plan, due_date)
+     values ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) returning *`,
     [orgId, p.title, p.description ?? null, p.category ?? null,
-     p.likelihood, p.impact, p.residualLikelihood ?? null, p.residualImpact ?? null,
+     p.likelihood, p.impact, p.frequency ?? null, p.controlEffectiveness ?? null,
+     inherentScore, p.residualLikelihood ?? null, p.residualImpact ?? null, residualScore,
      p.status ?? "OPEN", userId, p.treatmentPlan ?? null, p.dueDate ?? null]
   );
-  await logActivity(orgId, userId, "CREATED", "RISK", r.rows[0].id, p.title, `Score: ${r.rows[0].inherent_score}`);
+  await logActivity(orgId, userId, "CREATED", "RISK", r.rows[0].id, p.title, `Score: ${inherentScore}`);
   return r.rows[0];
 });
 
@@ -263,8 +268,28 @@ app.put("/risks/:id", async (req) => {
   if (p.category !== undefined) { fields.push(`category = $${idx++}`); values.push(p.category); }
   if (p.likelihood !== undefined) { fields.push(`likelihood = $${idx++}`); values.push(p.likelihood); }
   if (p.impact !== undefined) { fields.push(`impact = $${idx++}`); values.push(p.impact); }
+  if (p.frequency !== undefined) { fields.push(`frequency = $${idx++}`); values.push(p.frequency); }
+  if (p.controlEffectiveness !== undefined) { fields.push(`control_effectiveness = $${idx++}`); values.push(p.controlEffectiveness); }
   if (p.residualLikelihood !== undefined) { fields.push(`residual_likelihood = $${idx++}`); values.push(p.residualLikelihood); }
   if (p.residualImpact !== undefined) { fields.push(`residual_impact = $${idx++}`); values.push(p.residualImpact); }
+  // Auto-calculate scores when components change
+  if (p.likelihood !== undefined || p.impact !== undefined) {
+    // Need to fetch current values to compute
+    const cur = await pool.query(`SELECT likelihood, impact FROM risks WHERE id = $1 AND org_id = $2`, [id, orgId]);
+    if (cur.rows.length > 0) {
+      const l = p.likelihood ?? cur.rows[0].likelihood;
+      const i = p.impact ?? cur.rows[0].impact;
+      fields.push(`inherent_score = $${idx++}`); values.push(l * i);
+    }
+  }
+  if (p.residualLikelihood !== undefined || p.residualImpact !== undefined) {
+    const cur = await pool.query(`SELECT residual_likelihood, residual_impact FROM risks WHERE id = $1 AND org_id = $2`, [id, orgId]);
+    if (cur.rows.length > 0) {
+      const rl = p.residualLikelihood ?? cur.rows[0].residual_likelihood;
+      const ri = p.residualImpact ?? cur.rows[0].residual_impact;
+      if (rl && ri) { fields.push(`residual_score = $${idx++}`); values.push(rl * ri); }
+    }
+  }
   if (p.status !== undefined) { fields.push(`status = $${idx++}`); values.push(p.status); }
   if (p.treatmentPlan !== undefined) { fields.push(`treatment_plan = $${idx++}`); values.push(p.treatmentPlan); }
   if (p.dueDate !== undefined) { fields.push(`due_date = $${idx++}`); values.push(p.dueDate); }

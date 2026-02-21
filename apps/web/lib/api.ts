@@ -128,6 +128,9 @@ export async function createRisk(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   if (title.length < 2) { redirect("/risks"); return; }
 
+  const freq = str(formData, "frequency");
+  const ce = str(formData, "controlEffectiveness");
+
   await apiFetch("/risks", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -136,6 +139,8 @@ export async function createRisk(formData: FormData) {
       category: str(formData, "category"),
       likelihood: num(formData, "likelihood", 3),
       impact: num(formData, "impact", 3),
+      frequency: freq ? Number(freq) : undefined,
+      controlEffectiveness: ce ? Number(ce) : undefined,
       treatmentPlan: str(formData, "treatmentPlan"),
       dueDate: str(formData, "dueDate"),
     }),

@@ -21,6 +21,18 @@ function riskLevel(score: number) {
   return "VERY LOW";
 }
 
+function scoreColor(score: number) {
+  if (score >= 20) return "#ef4444";
+  if (score >= 15) return "#f59e0b";
+  if (score >= 10) return "#eab308";
+  if (score >= 5) return "#3b82f6";
+  return "#22c55e";
+}
+
+const FREQ_LABELS: Record<number, string> = { 1: "Annual or less", 2: "Quarterly", 3: "Monthly", 4: "Weekly+" };
+const CTRL_LABELS: Record<number, string> = { 1: "Strong", 2: "Adequate", 3: "Weak", 4: "None" };
+const CTRL_COLORS: Record<number, string> = { 1: "#22c55e", 2: "#3b82f6", 3: "#f59e0b", 4: "#ef4444" };
+
 export default function RiskDetailClient({
   risk,
   evidence,
@@ -42,8 +54,13 @@ export default function RiskDetailClient({
   const [isPending, startTransition] = useTransition();
 
   const handleSaveField = async (name: string, value: string) => {
-    const numericFields = ["likelihood", "impact", "residualLikelihood", "residualImpact"];
-    await updateRisk(risk.id, { [name]: numericFields.includes(name) ? Number(value) : value });
+    const numFields = ["likelihood", "impact", "frequency", "controlEffectiveness", "residualLikelihood", "residualImpact"];
+    if (numFields.includes(name)) {
+      if (!value || value === "") return;
+      await updateRisk(risk.id, { [name]: Number(value) });
+    } else {
+      await updateRisk(risk.id, { [name]: value });
+    }
     router.refresh();
   };
 
@@ -68,7 +85,7 @@ export default function RiskDetailClient({
           <a href="/risks" style={{ fontSize: 12, color: "#6b7280", textDecoration: "none" }}>← Back to Risk Register</a>
           <h1 className="page-title" style={{ marginTop: 4 }}>{risk.title}</h1>
           <p className="page-subtitle">
-            {risk.category || "Uncategorized"} · Score: {inherentScore} · {riskLevel(inherentScore)}
+            {risk.category || "Uncategorized"} · Inherent Score: {inherentScore} · {riskLevel(inherentScore)}
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
@@ -81,51 +98,88 @@ export default function RiskDetailClient({
         </div>
       </div>
 
-      {/* Scoring Summary Cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 20 }}>
+      {/* Scoring Summary — 3 cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 16, marginBottom: 20 }}>
         {/* Inherent Risk */}
-        <div className="card" style={{ padding: "20px" }}>
+        <div className="card" style={{ padding: "20px", borderTop: `3px solid ${scoreColor(inherentScore)}` }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9ca3af", marginBottom: 12 }}>
             Inherent Risk
           </div>
-          <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
             <div style={{ textAlign: "center" }}>
               <div className={`score-badge ${scoreClass(inherentScore)}`} style={{ fontSize: 28, padding: "8px 16px" }}>
                 {inherentScore}
               </div>
               <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>{riskLevel(inherentScore)}</div>
             </div>
-            <div style={{ fontSize: 13, color: "#6b7280" }}>
+            <div style={{ fontSize: 12, color: "#6b7280" }}>
               <div>Likelihood: <strong style={{ color: "#111" }}>{risk.likelihood}</strong>/5</div>
-              <div style={{ marginTop: 4 }}>Impact: <strong style={{ color: "#111" }}>{risk.impact}</strong>/5</div>
-              <div style={{ marginTop: 4, fontSize: 12, color: "#9ca3af" }}>
+              <div style={{ marginTop: 2 }}>Impact: <strong style={{ color: "#111" }}>{risk.impact}</strong>/5</div>
+              <div style={{ marginTop: 2, fontSize: 11, color: "#9ca3af" }}>
                 {risk.likelihood} × {risk.impact} = {inherentScore}
               </div>
             </div>
           </div>
         </div>
 
-        {/* Residual Risk */}
+        {/* Control & Frequency */}
         <div className="card" style={{ padding: "20px" }}>
+          <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9ca3af", marginBottom: 12 }}>
+            Context Factors
+          </div>
+          <div style={{ fontSize: 13 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ color: "#6b7280" }}>Frequency</span>
+              {risk.frequency ? (
+                <span style={{ fontWeight: 600, color: "#111" }}>{risk.frequency}/4 — {FREQ_LABELS[risk.frequency]}</span>
+              ) : (
+                <span style={{ color: "#9ca3af" }}>Not assessed</span>
+              )}
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ color: "#6b7280" }}>Control Effectiveness</span>
+              {risk.control_effectiveness ? (
+                <span style={{ fontWeight: 600, color: CTRL_COLORS[risk.control_effectiveness] }}>
+                  {risk.control_effectiveness}/4 — {CTRL_LABELS[risk.control_effectiveness]}
+                </span>
+              ) : (
+                <span style={{ color: "#9ca3af" }}>Not assessed</span>
+              )}
+            </div>
+          </div>
+          {risk.control_effectiveness && risk.control_effectiveness >= 3 && (
+            <div style={{ marginTop: 12, padding: "6px 10px", background: "#fef2f2", borderRadius: 6, fontSize: 11, color: "#991b1b" }}>
+              ⚠ Controls are {risk.control_effectiveness === 4 ? "absent" : "weak"} — treatment priority should be elevated
+            </div>
+          )}
+        </div>
+
+        {/* Residual Risk */}
+        <div className="card" style={{ padding: "20px", borderTop: residualScore !== null ? `3px solid ${scoreColor(residualScore)}` : "3px solid #e5e7eb" }}>
           <div style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.05em", color: "#9ca3af", marginBottom: 12 }}>
             Residual Risk
           </div>
           {residualScore !== null ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
               <div style={{ textAlign: "center" }}>
                 <div className={`score-badge ${scoreClass(residualScore)}`} style={{ fontSize: 28, padding: "8px 16px" }}>
                   {residualScore}
                 </div>
                 <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>{riskLevel(residualScore)}</div>
               </div>
-              <div style={{ fontSize: 13, color: "#6b7280" }}>
-                <div>Residual Likelihood: <strong style={{ color: "#111" }}>{risk.residual_likelihood}</strong>/5</div>
-                <div style={{ marginTop: 4 }}>Residual Impact: <strong style={{ color: "#111" }}>{risk.residual_impact}</strong>/5</div>
+              <div style={{ fontSize: 12, color: "#6b7280" }}>
+                <div>Likelihood: <strong style={{ color: "#111" }}>{risk.residual_likelihood}</strong>/5</div>
+                <div style={{ marginTop: 2 }}>Impact: <strong style={{ color: "#111" }}>{risk.residual_impact}</strong>/5</div>
+                {residualScore < inherentScore && (
+                  <div style={{ marginTop: 4, fontSize: 11, fontWeight: 600, color: "#22c55e" }}>
+                    ↓ {Math.round((1 - residualScore / inherentScore) * 100)}% reduction
+                  </div>
+                )}
               </div>
             </div>
           ) : (
             <div style={{ fontSize: 13, color: "#9ca3af", padding: "12px 0" }}>
-              Not assessed yet. Edit residual scores below.
+              Not assessed yet. Set residual scores in the Scoring tab.
             </div>
           )}
         </div>
@@ -145,36 +199,49 @@ export default function RiskDetailClient({
 
           {/* Scoring Tab */}
           <div>
-            <div style={{ marginBottom: 20 }}>
+            {/* Inherent */}
+            <div style={{ marginBottom: 24 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#111", marginBottom: 10 }}>Inherent Risk Scoring</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <InlineEdit label="Likelihood (1-5)" name="likelihood" value={String(risk.likelihood)} type="number" onSave={handleSaveField} />
-                <InlineEdit label="Impact (1-5)" name="impact" value={String(risk.impact)} type="number" onSave={handleSaveField} />
+                <InlineEdit label="Likelihood (1–5): 1=Rare, 5=Almost Certain" name="likelihood" value={String(risk.likelihood)} type="select"
+                  options={["1", "2", "3", "4", "5"]} onSave={handleSaveField} />
+                <InlineEdit label="Impact (1–5): 1=Negligible, 5=Severe" name="impact" value={String(risk.impact)} type="select"
+                  options={["1", "2", "3", "4", "5"]} onSave={handleSaveField} />
+              </div>
+              <div style={{ marginTop: 8, fontSize: 12, color: "#9ca3af" }}>
+                Inherent Score = {risk.likelihood} × {risk.impact} = <strong style={{ color: scoreColor(inherentScore) }}>{inherentScore}</strong>
               </div>
             </div>
 
-            <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 20 }}>
+            {/* Context Factors */}
+            <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 20, marginBottom: 24 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "#111", marginBottom: 10 }}>Context Factors</div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <InlineEdit label="Frequency (1–4): 1=Annual, 4=Weekly+" name="frequency" value={risk.frequency ? String(risk.frequency) : ""} type="select"
+                  options={["1", "2", "3", "4"]} onSave={handleSaveField} />
+                <InlineEdit label="Control Effectiveness (1–4): 1=Strong, 4=None" name="controlEffectiveness" value={risk.control_effectiveness ? String(risk.control_effectiveness) : ""} type="select"
+                  options={["1", "2", "3", "4"]} onSave={handleSaveField} />
+              </div>
+              <div style={{ marginTop: 8, padding: 12, background: "#f9fafb", borderRadius: 8, fontSize: 12, color: "#6b7280" }}>
+                These factors provide additional context for risk prioritisation. Higher frequency and weaker controls indicate greater urgency for treatment.
+              </div>
+            </div>
+
+            {/* Residual */}
+            <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 20, marginBottom: 24 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#111", marginBottom: 10 }}>Residual Risk Scoring</div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-                <InlineEdit
-                  label="Residual Likelihood (1-5)"
-                  name="residualLikelihood"
-                  value={risk.residual_likelihood ? String(risk.residual_likelihood) : ""}
-                  type="number"
-                  onSave={handleSaveField}
-                />
-                <InlineEdit
-                  label="Residual Impact (1-5)"
-                  name="residualImpact"
-                  value={risk.residual_impact ? String(risk.residual_impact) : ""}
-                  type="number"
-                  onSave={handleSaveField}
-                />
+                <InlineEdit label="Residual Likelihood (1–5)" name="residualLikelihood"
+                  value={risk.residual_likelihood ? String(risk.residual_likelihood) : ""} type="select"
+                  options={["1", "2", "3", "4", "5"]} onSave={handleSaveField} />
+                <InlineEdit label="Residual Impact (1–5)" name="residualImpact"
+                  value={risk.residual_impact ? String(risk.residual_impact) : ""} type="select"
+                  options={["1", "2", "3", "4", "5"]} onSave={handleSaveField} />
               </div>
             </div>
 
             {/* Visual Score Comparison */}
-            <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 20, marginTop: 20 }}>
+            <div style={{ borderTop: "1px solid #f3f4f6", paddingTop: 20 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: "#111", marginBottom: 12 }}>Score Comparison</div>
               <div style={{ display: "flex", gap: 32, alignItems: "center" }}>
                 <div style={{ textAlign: "center" }}>
@@ -184,7 +251,14 @@ export default function RiskDetailClient({
                   </div>
                   <div style={{ fontSize: 11, color: "#6b7280", marginTop: 4 }}>{riskLevel(inherentScore)}</div>
                 </div>
-                <div style={{ fontSize: 24, color: "#d1d5db" }}>→</div>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+                  <div style={{ fontSize: 24, color: "#d1d5db" }}>→</div>
+                  {risk.control_effectiveness && (
+                    <div style={{ fontSize: 10, color: CTRL_COLORS[risk.control_effectiveness], fontWeight: 600 }}>
+                      Controls: {CTRL_LABELS[risk.control_effectiveness]}
+                    </div>
+                  )}
+                </div>
                 <div style={{ textAlign: "center" }}>
                   <div style={{ fontSize: 11, color: "#9ca3af", marginBottom: 4 }}>RESIDUAL</div>
                   {residualScore !== null ? (
@@ -226,11 +300,8 @@ export default function RiskDetailClient({
           <div>
             {activity.map((a: any) => (
               <div key={a.id} style={{
-                padding: "10px 0",
-                borderBottom: "1px solid #f3f4f6",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
+                padding: "10px 0", borderBottom: "1px solid #f3f4f6",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
               }}>
                 <div>
                   <span style={{ fontSize: 13, fontWeight: 500, color: "#111" }}>{a.action}</span>

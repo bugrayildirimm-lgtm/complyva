@@ -11,7 +11,7 @@ export default async function RisksPage() {
       <div className="page-header">
         <div>
           <h1 className="page-title">Risk Register</h1>
-          <p className="page-subtitle">Risk register, treatment tracking, and approval workflow</p>
+          <p className="page-subtitle">3-factor risk scoring, treatment tracking, and approval workflow</p>
         </div>
         <ExportButton type="risks" />
       </div>
@@ -19,21 +19,53 @@ export default async function RisksPage() {
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: "#111" }}>Add Risk</div>
         <form action={createRisk} className="form-grid">
-          <div className="form-group">
+          <div className="form-group form-full">
             <label className="form-label">Title</label>
-            <input name="title" className="form-input" placeholder="Access logs not retained" required />
+            <input name="title" className="form-input" placeholder="Access logs not retained for required period" required />
           </div>
           <div className="form-group">
             <label className="form-label">Category</label>
-            <input name="category" className="form-input" placeholder="Logging" />
+            <input name="category" className="form-input" placeholder="Logging / Data Protection / ..." />
           </div>
           <div className="form-group">
-            <label className="form-label">Likelihood (1-5)</label>
-            <input name="likelihood" type="number" min={1} max={5} defaultValue={3} className="form-input" required />
+            <label className="form-label">Likelihood (1–5)</label>
+            <select name="likelihood" className="form-select" defaultValue="3">
+              <option value="1">1 — Rare</option>
+              <option value="2">2 — Unlikely</option>
+              <option value="3">3 — Possible</option>
+              <option value="4">4 — Likely</option>
+              <option value="5">5 — Almost Certain</option>
+            </select>
           </div>
           <div className="form-group">
-            <label className="form-label">Impact (1-5)</label>
-            <input name="impact" type="number" min={1} max={5} defaultValue={3} className="form-input" required />
+            <label className="form-label">Impact (1–5)</label>
+            <select name="impact" className="form-select" defaultValue="3">
+              <option value="1">1 — Negligible</option>
+              <option value="2">2 — Minor</option>
+              <option value="3">3 — Moderate</option>
+              <option value="4">4 — Major</option>
+              <option value="5">5 — Severe</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Frequency (1–4)</label>
+            <select name="frequency" className="form-select" defaultValue="">
+              <option value="">Not assessed</option>
+              <option value="1">1 — Annual or less</option>
+              <option value="2">2 — Quarterly</option>
+              <option value="3">3 — Monthly</option>
+              <option value="4">4 — Weekly or more</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label className="form-label">Control Effectiveness (1–4)</label>
+            <select name="controlEffectiveness" className="form-select" defaultValue="">
+              <option value="">Not assessed</option>
+              <option value="1">1 — Strong (well designed & operating)</option>
+              <option value="2">2 — Adequate (minor gaps)</option>
+              <option value="3">3 — Weak (significant gaps)</option>
+              <option value="4">4 — None (no controls in place)</option>
+            </select>
           </div>
           <div className="form-group form-full">
             <label className="form-label">Treatment Plan</label>

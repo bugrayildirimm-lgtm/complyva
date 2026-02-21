@@ -21,6 +21,8 @@ export type Risk = {
   category: string | null;
   likelihood: number;
   impact: number;
+  frequency: number | null;
+  control_effectiveness: number | null;
   inherent_score: number;
   residual_likelihood: number | null;
   residual_impact: number | null;
