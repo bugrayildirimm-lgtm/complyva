@@ -114,7 +114,7 @@ export default async function AssetsPage() {
                   <a href={`/assets/${a.id}`} style={{ fontWeight: 550, color: "#111", textDecoration: "none" }}>
                     {a.name}
                   </a>
-                  {a.category && <div style={{ fontSize: 11, color: "#9ca3af" }}>{a.category}</div>}
+                  {a.category && <div style={{ fontSize: 11, color: "#6b7280" }}>{a.category}</div>}
                 </td>
                 <td><span className={`badge badge-${a.asset_type.toLowerCase()}`}>{a.asset_type}</span></td>
                 <td style={{ fontSize: 13 }}>{a.owner || "—"}</td>
@@ -154,7 +154,11 @@ export default async function AssetsPage() {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={8} className="muted" style={{ textAlign: "center", padding: 32 }}>No assets registered yet.</td></tr>
+              <tr><td colSpan={8} style={{ textAlign: "center", padding: "48px 24px" }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>🖥️</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>No assets registered yet</div>
+                <div style={{ fontSize: 13, color: "#6b7280" }}>Register your first asset above. Assets are the foundation for incident priority, change approval levels, and risk context.</div>
+              </td></tr>
             )}
           </tbody>
         </table>

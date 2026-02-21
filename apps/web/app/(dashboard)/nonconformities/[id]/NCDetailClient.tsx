@@ -2,8 +2,9 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Tabs, InlineEdit, DeleteButton, StatusDropdown } from "../../ActionComponents";
+import { Tabs, InlineEdit, DeleteButton, StatusDropdown, ConfirmAction } from "../../ActionComponents";
 import EvidencePanel from "../../EvidencePanel";
+import { useToast } from "../../Toast";
 import type { NonConformity } from "../../../../lib/types";
 
 const SEV_COLORS: Record<string, string> = { CRITICAL: "#ef4444", MAJOR: "#f59e0b", MINOR: "#3b82f6", OBSERVATION: "#22c55e" };
@@ -40,6 +41,7 @@ export default function NCDetailClient({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const toast = useToast();
 
   const handleSaveField = async (name: string, value: string) => {
     await updateNC(nc.id, { [name]: value });
@@ -57,12 +59,9 @@ export default function NCDetailClient({
   };
 
   const handleSendToCAPA = async () => {
-    if (!confirm("Create a CAPA from this non-conformity? It will appear in the CAPA Log.")) return;
-    startTransition(async () => {
-      await sendNCToCAPA(nc.id);
-      router.refresh();
-      alert("CAPA created successfully.");
-    });
+    await sendNCToCAPA(nc.id);
+    router.refresh();
+    toast.success("CAPA created from this non-conformity — it will appear in the CAPA Log.");
   };
 
   const currentStepIndex = STATUS_FLOW.findIndex((s) => s.status === nc.status);
@@ -81,10 +80,18 @@ export default function NCDetailClient({
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button onClick={handleSendToCAPA} disabled={isPending}
-            style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid #3b82f6", background: "#eff6ff", color: "#3b82f6", cursor: "pointer" }}>
-            → CAPA
-          </button>
+          <ConfirmAction
+            trigger={
+              <button disabled={isPending}
+                style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid #3b82f6", background: "#eff6ff", color: "#3b82f6", cursor: "pointer" }}>
+                → CAPA
+              </button>
+            }
+            message="Create a CAPA from this non-conformity? It will appear in the CAPA Log."
+            confirmLabel="Create CAPA"
+            confirmStyle="primary"
+            onConfirm={handleSendToCAPA}
+          />
           <StatusDropdown
             currentStatus={nc.status}
             options={["OPEN", "UNDER_INVESTIGATION", "CONTAINMENT", "CORRECTIVE_ACTION", "VERIFIED", "CLOSED"]}
@@ -173,7 +180,7 @@ export default function NCDetailClient({
         <Tabs tabs={["Details", "Investigation", "Evidence", "Activity"]}>
           {/* Details Tab */}
           <div>
-            <InlineEdit label="Title" name="title" value={nc.title} onSave={handleSaveField} />
+            <InlineEdit label="Title" name="title" value={nc.title} onSave={handleSaveField} required />
             <InlineEdit label="Description" name="description" value={nc.description || ""} type="textarea" onSave={handleSaveField} />
             <InlineEdit label="Severity" name="severity" value={nc.severity} type="select"
               options={["OBSERVATION", "MINOR", "MAJOR", "CRITICAL"]} onSave={handleSaveField} />

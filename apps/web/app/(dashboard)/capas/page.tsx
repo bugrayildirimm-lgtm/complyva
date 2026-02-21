@@ -190,7 +190,11 @@ export default async function CAPAsPage() {
               );
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={8} className="muted" style={{ textAlign: "center", padding: 32 }}>No CAPAs created yet.</td></tr>
+              <tr><td colSpan={8} style={{ textAlign: "center", padding: "48px 24px" }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>✅</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>No CAPAs created yet</div>
+                <div style={{ fontSize: 13, color: "#6b7280" }}>CAPAs track corrective and preventive actions. Create one above or generate from a non-conformity.</div>
+              </td></tr>
             )}
           </tbody>
         </table>

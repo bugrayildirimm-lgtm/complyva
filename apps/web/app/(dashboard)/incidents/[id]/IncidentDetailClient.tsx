@@ -2,8 +2,9 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Tabs, InlineEdit, DeleteButton, StatusDropdown } from "../../ActionComponents";
+import { Tabs, InlineEdit, DeleteButton, StatusDropdown, ConfirmAction } from "../../ActionComponents";
 import EvidencePanel from "../../EvidencePanel";
+import { useToast } from "../../Toast";
 import type { Incident, Asset } from "../../../../lib/types";
 
 const SEV_COLORS: Record<string, string> = {
@@ -35,6 +36,7 @@ export default function IncidentDetailClient({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const toast = useToast();
 
   const handleSaveField = async (name: string, value: string) => {
     await updateIncident(incident.id, { [name]: value });
@@ -52,21 +54,15 @@ export default function IncidentDetailClient({
   };
 
   const handleSendToRisk = async () => {
-    if (!confirm("Create a new risk from this incident? It will appear in the Risk Register as PENDING REVIEW.")) return;
-    startTransition(async () => {
-      await sendIncidentToRisk(incident.id);
-      router.refresh();
-      alert("Risk created successfully.");
-    });
+    await sendIncidentToRisk(incident.id);
+    router.refresh();
+    toast.success("Risk created from incident — it will appear as PENDING REVIEW in the Risk Register.");
   };
 
   const handleSendToNC = async () => {
-    if (!confirm("Create a non-conformity from this incident? It will appear in the NC Register.")) return;
-    startTransition(async () => {
-      await sendIncidentToNC(incident.id);
-      router.refresh();
-      alert("Non-conformity created successfully.");
-    });
+    await sendIncidentToNC(incident.id);
+    router.refresh();
+    toast.success("Non-conformity created from incident — it will appear in the NC Register.");
   };
 
   const detectionDelay = incident.incident_date && incident.detected_date
@@ -85,14 +81,30 @@ export default function IncidentDetailClient({
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <button onClick={handleSendToRisk} disabled={isPending}
-            style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid #ef4444", background: "#fef2f2", color: "#ef4444", cursor: "pointer" }}>
-            → Risk
-          </button>
-          <button onClick={handleSendToNC} disabled={isPending}
-            style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid #8b5cf6", background: "#f5f3ff", color: "#8b5cf6", cursor: "pointer" }}>
-            → NC
-          </button>
+          <ConfirmAction
+            trigger={
+              <button disabled={isPending}
+                style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid #ef4444", background: "#fef2f2", color: "#ef4444", cursor: "pointer" }}>
+                → Risk
+              </button>
+            }
+            message="Create a new risk from this incident? It will appear in the Risk Register as PENDING REVIEW."
+            confirmLabel="Create Risk"
+            confirmStyle="primary"
+            onConfirm={handleSendToRisk}
+          />
+          <ConfirmAction
+            trigger={
+              <button disabled={isPending}
+                style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid #8b5cf6", background: "#f5f3ff", color: "#8b5cf6", cursor: "pointer" }}>
+                → NC
+              </button>
+            }
+            message="Create a non-conformity from this incident? It will appear in the NC Register."
+            confirmLabel="Create NC"
+            confirmStyle="primary"
+            onConfirm={handleSendToNC}
+          />
           <StatusDropdown
             currentStatus={incident.status}
             options={["OPEN", "INVESTIGATING", "CONTAINED", "RESOLVED", "CLOSED"]}
@@ -139,7 +151,7 @@ export default function IncidentDetailClient({
         <Tabs tabs={["Details", "Investigation", "Evidence", "Activity"]}>
           {/* Details Tab */}
           <div>
-            <InlineEdit label="Title" name="title" value={incident.title} onSave={handleSaveField} />
+            <InlineEdit label="Title" name="title" value={incident.title} onSave={handleSaveField} required />
             <InlineEdit label="Description" name="description" value={incident.description || ""} type="textarea" onSave={handleSaveField} />
             <InlineEdit label="Category" name="category" value={incident.category || ""} onSave={handleSaveField} />
             <InlineEdit label="Severity" name="severity" value={incident.severity} type="select"

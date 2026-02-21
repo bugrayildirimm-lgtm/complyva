@@ -93,7 +93,11 @@ export default async function CertificationsPage() {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 32 }}>No certifications yet.</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: "center", padding: "48px 24px" }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>🛡️</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>No certifications yet</div>
+                <div style={{ fontSize: 13, color: "#6b7280" }}>Add your first certification above to track frameworks, expiry dates, and renewal deadlines.</div>
+              </td></tr>
             )}
           </tbody>
         </table>

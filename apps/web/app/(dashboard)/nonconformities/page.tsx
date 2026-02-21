@@ -130,7 +130,7 @@ export default async function NCsPage() {
                     <a href={`/nonconformities/${n.id}`} style={{ fontWeight: 550, color: "#111", textDecoration: "none" }}>
                       {n.title}
                     </a>
-                    {n.category && <div style={{ fontSize: 11, color: "#9ca3af" }}>{n.category}</div>}
+                    {n.category && <div style={{ fontSize: 11, color: "#6b7280" }}>{n.category}</div>}
                   </td>
                   <td>
                     <span style={{
@@ -156,7 +156,11 @@ export default async function NCsPage() {
               );
             })}
             {rows.length === 0 && (
-              <tr><td colSpan={7} className="muted" style={{ textAlign: "center", padding: 32 }}>No non-conformities raised yet.</td></tr>
+              <tr><td colSpan={7} style={{ textAlign: "center", padding: "48px 24px" }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>❌</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>No non-conformities raised yet</div>
+                <div style={{ fontSize: 13, color: "#6b7280" }}>Non-conformities can be raised manually or created from incidents and audit findings. Use the form above to get started.</div>
+              </td></tr>
             )}
           </tbody>
         </table>

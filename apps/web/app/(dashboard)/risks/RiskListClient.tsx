@@ -193,8 +193,10 @@ export default function RiskListClient({ risks }: { risks: Risk[] }) {
             ))}
             {filtered.length === 0 && (
               <tr>
-                <td colSpan={7} className="muted" style={{ textAlign: "center", padding: 32 }}>
-                  No risks in this category.
+                <td colSpan={7} style={{ textAlign: "center", padding: "48px 24px" }}>
+                  <div style={{ fontSize: 36, marginBottom: 8 }}>⚠️</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>No risks in this category</div>
+                  <div style={{ fontSize: 13, color: "#6b7280" }}>Try selecting a different tab, or create a new risk using the form above.</div>
                 </td>
               </tr>
             )}

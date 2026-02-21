@@ -1,10 +1,7 @@
-/* eslint-disable no-restricted-globals */
 "use client";
 
-declare function alert(message?: any): void;
-declare function confirm(message?: string): boolean;
-
 import { useState } from "react";
+import { useToast } from "./Toast";
 
 type EvidenceFile = {
   id: string;
@@ -29,6 +26,9 @@ export default function EvidencePanel({
 }) {
   const [uploading, setUploading] = useState(false);
   const [fileList, setFileList] = useState<EvidenceFile[]>(files);
+  const [confirmingId, setConfirmingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const toast = useToast();
 
   function formatSize(bytes: number) {
     if (bytes < 1024) return `${bytes} B`;
@@ -50,20 +50,24 @@ export default function EvidencePanel({
         },
         ...prev,
       ]);
+      toast.success("File uploaded successfully");
     } catch (err: any) {
-      alert(err.message || "Upload failed");
+      toast.error(err.message || "Upload failed");
     }
     setUploading(false);
   }
 
   async function handleDelete(fileId: string) {
-    if (!confirm("Delete this file?")) return;
+    setDeletingId(fileId);
     try {
       await deleteAction(fileId);
       setFileList((prev) => prev.filter((f) => f.id !== fileId));
+      toast.success("File deleted");
     } catch (err: any) {
-      alert(err.message || "Delete failed");
+      toast.error(err.message || "Delete failed");
     }
+    setDeletingId(null);
+    setConfirmingId(null);
   }
 
   function handleDownload(fileId: string, fileName: string) {
@@ -102,13 +106,15 @@ export default function EvidencePanel({
           className="btn btn-primary"
           style={{ padding: "6px 14px", fontSize: 12 }}
         >
-          {uploading ? "Uploading..." : "Upload"}
+          {uploading ? <><span className="spinner" /> Uploading…</> : "Upload"}
         </button>
       </form>
 
       {fileList.length === 0 ? (
-        <div style={{ fontSize: 13, color: "#9ca3af", padding: "8px 0" }}>
-          No evidence files yet.
+        <div style={{ textAlign: "center", padding: "24px 16px" }}>
+          <div style={{ fontSize: 28, marginBottom: 6 }}>📎</div>
+          <div style={{ fontSize: 13, color: "#6b7280" }}>No evidence files yet.</div>
+          <div style={{ fontSize: 12, color: "#d1d5db", marginTop: 2 }}>Upload documents, screenshots, or reports above.</div>
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
@@ -130,12 +136,12 @@ export default function EvidencePanel({
                   <div style={{ fontSize: 13, fontWeight: 500, color: "#111", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                     {f.file_name}
                   </div>
-                  <div style={{ fontSize: 11, color: "#9ca3af" }}>
+                  <div style={{ fontSize: 11, color: "#6b7280" }}>
                     {formatSize(f.file_size)} · {new Date(f.uploaded_at).toLocaleDateString()}
                   </div>
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 6 }}>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
                 <button
                   onClick={() => handleDownload(f.id, f.file_name)}
                   style={{
@@ -145,15 +151,39 @@ export default function EvidencePanel({
                 >
                   ↓ Download
                 </button>
-                <button
-                  onClick={() => handleDelete(f.id)}
-                  style={{
-                    padding: "4px 8px", borderRadius: 6, border: "1px solid #e8eaed",
-                    background: "#fff", fontSize: 11, color: "#dc2626", cursor: "pointer",
-                  }}
-                >
-                  Delete
-                </button>
+                {confirmingId === f.id ? (
+                  <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
+                    <button
+                      onClick={() => handleDelete(f.id)}
+                      disabled={deletingId === f.id}
+                      style={{
+                        padding: "4px 8px", borderRadius: 6, border: "1px solid #ef4444",
+                        background: "#fef2f2", fontSize: 11, color: "#dc2626", cursor: "pointer",
+                      }}
+                    >
+                      {deletingId === f.id ? <><span className="spinner" /></> : "Yes"}
+                    </button>
+                    <button
+                      onClick={() => setConfirmingId(null)}
+                      style={{
+                        padding: "4px 8px", borderRadius: 6, border: "1px solid #e8eaed",
+                        background: "#fff", fontSize: 11, color: "#6b7280", cursor: "pointer",
+                      }}
+                    >
+                      No
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    onClick={() => setConfirmingId(f.id)}
+                    style={{
+                      padding: "4px 8px", borderRadius: 6, border: "1px solid #e8eaed",
+                      background: "#fff", fontSize: 11, color: "#dc2626", cursor: "pointer",
+                    }}
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
             </div>
           ))}

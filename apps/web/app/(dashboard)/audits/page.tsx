@@ -87,7 +87,11 @@ export default async function AuditsPage() {
               </tr>
             ))}
             {rows.length === 0 && (
-              <tr><td colSpan={6} className="muted" style={{ textAlign: "center", padding: 32 }}>No audits yet.</td></tr>
+              <tr><td colSpan={6} style={{ textAlign: "center", padding: "48px 24px" }}>
+                <div style={{ fontSize: 36, marginBottom: 8 }}>📋</div>
+                <div style={{ fontSize: 15, fontWeight: 600, color: "#4b5563", marginBottom: 4 }}>No audits yet</div>
+                <div style={{ fontSize: 13, color: "#6b7280" }}>Create your first audit using the form above to start tracking compliance engagements.</div>
+              </td></tr>
             )}
           </tbody>
         </table>
