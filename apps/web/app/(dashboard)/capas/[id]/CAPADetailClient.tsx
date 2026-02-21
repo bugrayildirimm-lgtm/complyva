@@ -38,6 +38,7 @@ export default function CAPADetailClient({
   deleteCAPA,
   uploadEvidence,
   deleteEvidence,
+  role,
 }: {
   capa: CAPA;
   assets: any[];
@@ -48,6 +49,7 @@ export default function CAPADetailClient({
   deleteCAPA: (id: string) => Promise<void>;
   uploadEvidence: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
   deleteEvidence: (fileId: string) => Promise<any>;
+  role: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -95,7 +97,7 @@ export default function CAPADetailClient({
             options={["OPEN", "UNDER_INVESTIGATION", "ACTION_DEFINED", "IN_PROGRESS", "PENDING_VERIFICATION", "CLOSED", "REOPENED"]}
             onStatusChange={handleStatusChange}
           />
-          <DeleteButton onDelete={handleDelete} />
+          {canEdit && <DeleteButton onDelete={handleDelete} />}
         </div>
       </div>
 
@@ -285,6 +287,7 @@ export default function CAPADetailClient({
               files={evidence}
               uploadAction={uploadEvidence}
               deleteAction={deleteEvidence}
+              readOnly={!canEdit}
             />
           </div>
 

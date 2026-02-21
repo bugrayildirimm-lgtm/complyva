@@ -1,4 +1,4 @@
-import { getAudit, getFindings, getEvidence, getEntityActivity, updateAudit, deleteAudit, createFinding, updateFinding, deleteFinding, sendFindingToRisk, uploadEvidence, deleteEvidence } from "../../../../lib/api";
+import { getAudit, getFindings, getEvidence, getEntityActivity, updateAudit, deleteAudit, createFinding, updateFinding, deleteFinding, sendFindingToRisk, uploadEvidence, deleteEvidence, getCurrentRole } from "../../../../lib/api";
 import type { Audit, Finding } from "../../../../lib/types";
 import AuditDetailClient from "./AuditDetailClient";
 
@@ -10,6 +10,7 @@ export default async function AuditDetailPage({ params }: { params: Promise<{ id
  let activity: any[] = [];
 try { activity = await getEntityActivity("AUDIT", id); } catch { activity = []; }
 
+  const role = await getCurrentRole();
   return (
     <AuditDetailClient
       audit={audit}
@@ -24,6 +25,7 @@ try { activity = await getEntityActivity("AUDIT", id); } catch { activity = []; 
       sendFindingToRisk={sendFindingToRisk}
       uploadEvidence={uploadEvidence}
       deleteEvidence={deleteEvidence}
+      role={role}
     />
   );
 }

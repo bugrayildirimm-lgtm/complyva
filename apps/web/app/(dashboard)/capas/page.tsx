@@ -1,4 +1,4 @@
-import { createCAPA, getCAPAs, getAssets } from "../../../lib/api";
+import { createCAPA, getCAPAs, getAssets , getCurrentRole } from "../../../lib/api";
 import type { CAPA, Asset } from "../../../lib/types";
 import ExportButton from "../ExportButton";
 
@@ -19,6 +19,7 @@ export default async function CAPAsPage() {
   const correctiveCount = rows.filter((c) => c.capa_type === "CORRECTIVE" && openStatuses.includes(c.status)).length;
   const preventiveCount = rows.filter((c) => c.capa_type === "PREVENTIVE" && openStatuses.includes(c.status)).length;
 
+  const role = await getCurrentRole();
   return (
     <>
       <div className="page-header">
@@ -29,6 +30,7 @@ export default async function CAPAsPage() {
         <ExportButton type="capas" />
       </div>
 
+      {role !== "VIEWER" && (
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: "#111" }}>Create CAPA</div>
         <form action={createCAPA} className="form-grid">
@@ -121,6 +123,7 @@ export default async function CAPAsPage() {
           </div>
         </form>
       </div>
+      )}
 
       {/* Summary Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>

@@ -17,12 +17,14 @@ export default function EvidencePanel({
   files,
   uploadAction,
   deleteAction,
+  readOnly = false,
 }: {
   entityType: string;
   entityId: string;
   files: EvidenceFile[];
   uploadAction: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
   deleteAction: (fileId: string) => Promise<any>;
+  readOnly?: boolean;
 }) {
   const [uploading, setUploading] = useState(false);
   const [fileList, setFileList] = useState<EvidenceFile[]>(files);
@@ -86,7 +88,7 @@ export default function EvidencePanel({
         <span className="badge badge-planned">{fileList.length} file{fileList.length !== 1 ? "s" : ""}</span>
       </div>
 
-      <form
+      {!readOnly && <form
         action={handleUpload}
         style={{
           display: "flex", gap: 10, alignItems: "center",
@@ -108,7 +110,7 @@ export default function EvidencePanel({
         >
           {uploading ? <><span className="spinner" /> Uploading…</> : "Upload"}
         </button>
-      </form>
+      </form>}
 
       {fileList.length === 0 ? (
         <div style={{ textAlign: "center", padding: "24px 16px" }}>
@@ -151,7 +153,7 @@ export default function EvidencePanel({
                 >
                   ↓ Download
                 </button>
-                {confirmingId === f.id ? (
+                {!readOnly && (confirmingId === f.id ? (
                   <span style={{ display: "inline-flex", gap: 4, alignItems: "center" }}>
                     <button
                       onClick={() => handleDelete(f.id)}

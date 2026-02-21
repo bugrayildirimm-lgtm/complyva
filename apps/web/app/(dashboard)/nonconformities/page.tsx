@@ -1,4 +1,4 @@
-import { createNonConformity, getNonConformities, getAssets } from "../../../lib/api";
+import { createNonConformity, getNonConformities, getAssets , getCurrentRole } from "../../../lib/api";
 import type { NonConformity, Asset } from "../../../lib/types";
 import ExportButton from "../ExportButton";
 
@@ -13,6 +13,7 @@ export default async function NCsPage() {
   const openCount = rows.filter((n) => n.status !== "CLOSED").length;
   const overdueCount = rows.filter((n) => n.due_date && n.status !== "CLOSED" && new Date(n.due_date) < new Date()).length;
 
+  const role = await getCurrentRole();
   return (
     <>
       <div className="page-header">
@@ -23,6 +24,7 @@ export default async function NCsPage() {
         <ExportButton type="nonconformities" />
       </div>
 
+      {role !== "VIEWER" && (
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: "#111" }}>Raise Non-Conformity</div>
         <form action={createNonConformity} className="form-grid">
@@ -84,6 +86,7 @@ export default async function NCsPage() {
           </div>
         </form>
       </div>
+      )}
 
       {/* Summary Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>

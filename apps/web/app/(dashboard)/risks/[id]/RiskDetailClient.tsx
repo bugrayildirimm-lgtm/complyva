@@ -57,6 +57,7 @@ export default function RiskDetailClient({
   deleteRisk,
   uploadEvidence,
   deleteEvidence,
+  role,
 }: {
   risk: Risk;
   evidence: any[];
@@ -66,6 +67,7 @@ export default function RiskDetailClient({
   deleteRisk: (id: string) => Promise<void>;
   uploadEvidence: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
   deleteEvidence: (fileId: string) => Promise<any>;
+  role: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -111,7 +113,7 @@ export default function RiskDetailClient({
             options={["PENDING_REVIEW", "OPEN", "IN_TREATMENT", "ACCEPTED", "CLOSED", "REJECTED"]}
             onStatusChange={handleStatusChange}
           />
-          <DeleteButton onDelete={handleDelete} />
+          {canEdit && <DeleteButton onDelete={handleDelete} />}
         </div>
       </div>
 
@@ -479,6 +481,7 @@ export default function RiskDetailClient({
               files={evidence}
               uploadAction={uploadEvidence}
               deleteAction={deleteEvidence}
+              readOnly={!canEdit}
             />
           </div>
 

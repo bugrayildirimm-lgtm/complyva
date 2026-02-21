@@ -1,4 +1,4 @@
-import { createChange, getChanges, getAssets } from "../../../lib/api";
+import { createChange, getChanges, getAssets , getCurrentRole } from "../../../lib/api";
 import type { Change, Asset } from "../../../lib/types";
 import ExportButton from "../ExportButton";
 import ChangeListClient from "./ChangeListClient";
@@ -7,6 +7,7 @@ export default async function ChangesPage() {
   const rows: Change[] = await getChanges();
   const assets: Asset[] = await getAssets();
 
+  const role = await getCurrentRole();
   return (
     <>
       <div className="page-header">
@@ -17,6 +18,7 @@ export default async function ChangesPage() {
         <ExportButton type="changes" />
       </div>
 
+      {role !== "VIEWER" && (
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: "#111" }}>Request Change</div>
         <form action={createChange} className="form-grid">
@@ -76,6 +78,7 @@ export default async function ChangesPage() {
           </div>
         </form>
       </div>
+      )}
 
       <ChangeListClient changes={rows} />
     </>

@@ -19,6 +19,7 @@ export default function AuditDetailClient({
   sendFindingToRisk,
   uploadEvidence,
   deleteEvidence,
+  role,
 }: {
   audit: Audit;
   findings: Finding[];
@@ -32,6 +33,7 @@ export default function AuditDetailClient({
   sendFindingToRisk: (findingId: string) => Promise<any>;
   uploadEvidence: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
   deleteEvidence: (fileId: string) => Promise<any>;
+  role: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -77,7 +79,7 @@ export default function AuditDetailClient({
             options={["PLANNED", "IN_PROGRESS", "COMPLETED", "CANCELLED"]}
             onStatusChange={handleStatusChange}
           />
-          <DeleteButton onDelete={handleDelete} />
+          {canEdit && <DeleteButton onDelete={handleDelete} />}
         </div>
       </div>
 
@@ -97,7 +99,7 @@ export default function AuditDetailClient({
           {/* Findings Tab */}
           <div>
             {/* Add Finding Form */}
-            <div style={{ marginBottom: 20, padding: 16, background: "#f9fafb", borderRadius: 8 }}>
+            {canEdit && <div style={{ marginBottom: 20, padding: 16, background: "#f9fafb", borderRadius: 8 }}>
               <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Add Finding</div>
               <form
                 action={async (formData: FormData) => {
@@ -127,7 +129,7 @@ export default function AuditDetailClient({
                   <button type="submit" className="btn btn-primary" style={{ fontSize: 12, padding: "6px 14px" }}>Add Finding</button>
                 </div>
               </form>
-            </div>
+            </div>}
 
             {/* Findings List */}
             {findings.map((f) => (
@@ -146,11 +148,11 @@ export default function AuditDetailClient({
                       options={["OPEN", "IN_PROGRESS", "RESOLVED", "ACCEPTED"]}
                       onStatusChange={async (s) => { await updateFinding(f.id, { status: s }); router.refresh(); }}
                     />
-                    <SendToRiskButton onSend={async () => { await sendFindingToRisk(f.id); }} />
-                    <DeleteButton
+                    {canEdit && <SendToRiskButton onSend={async () => { await sendFindingToRisk(f.id); }} />}
+                    {canEdit && <DeleteButton
                       label="✕"
                       onDelete={async () => { await deleteFinding(f.id, audit.id); router.refresh(); }}
-                    />
+                    />}
                   </div>
                 </div>
               </div>
@@ -168,6 +170,7 @@ export default function AuditDetailClient({
               files={evidence}
               uploadAction={uploadEvidence}
               deleteAction={deleteEvidence}
+              readOnly={!canEdit}
             />
           </div>
 

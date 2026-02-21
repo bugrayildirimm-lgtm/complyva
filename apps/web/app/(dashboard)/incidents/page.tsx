@@ -1,4 +1,4 @@
-import { createIncident, getIncidents, getAssets } from "../../../lib/api";
+import { createIncident, getIncidents, getAssets , getCurrentRole } from "../../../lib/api";
 import type { Incident, Asset } from "../../../lib/types";
 import ExportButton from "../ExportButton";
 
@@ -10,6 +10,7 @@ export default async function IncidentsPage() {
   const rows: Incident[] = await getIncidents();
   const assets: Asset[] = await getAssets();
 
+  const role = await getCurrentRole();
   return (
     <>
       <div className="page-header">
@@ -20,6 +21,7 @@ export default async function IncidentsPage() {
         <ExportButton type="incidents" />
       </div>
 
+      {role !== "VIEWER" && (
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: "#111" }}>Report Incident</div>
         <form action={createIncident} className="form-grid">
@@ -74,6 +76,7 @@ export default async function IncidentsPage() {
           </div>
         </form>
       </div>
+      )}
 
       {/* Summary Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>

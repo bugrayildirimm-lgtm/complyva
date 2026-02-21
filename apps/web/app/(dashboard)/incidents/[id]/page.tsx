@@ -1,4 +1,4 @@
-import { getIncident, getAssets, getEvidence, getEntityActivity, getEntityCrossLinks, updateIncident, deleteIncident, sendIncidentToRisk, sendIncidentToNC, uploadEvidence, deleteEvidence } from "../../../../lib/api";
+import { getIncident, getAssets, getEvidence, getEntityActivity, getEntityCrossLinks, updateIncident, deleteIncident, sendIncidentToRisk, sendIncidentToNC, uploadEvidence, deleteEvidence, getCurrentRole } from "../../../../lib/api";
 import type { Incident, Asset } from "../../../../lib/types";
 import IncidentDetailClient from "./IncidentDetailClient";
 
@@ -12,6 +12,7 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
   let crossLinks: any[] = [];
   try { crossLinks = await getEntityCrossLinks("INCIDENT", id); } catch { crossLinks = []; }
 
+  const role = await getCurrentRole();
   return (
     <IncidentDetailClient
       incident={incident}
@@ -25,6 +26,7 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
       sendIncidentToNC={sendIncidentToNC}
       uploadEvidence={uploadEvidence}
       deleteEvidence={deleteEvidence}
+      role={role}
     />
   );
 }

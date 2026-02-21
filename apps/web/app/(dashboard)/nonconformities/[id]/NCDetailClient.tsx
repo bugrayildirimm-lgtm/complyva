@@ -30,6 +30,7 @@ export default function NCDetailClient({
   sendNCToCAPA,
   uploadEvidence,
   deleteEvidence,
+  role,
 }: {
   nc: NonConformity;
   assets: any[];
@@ -41,10 +42,12 @@ export default function NCDetailClient({
   sendNCToCAPA: (id: string) => Promise<any>;
   uploadEvidence: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
   deleteEvidence: (fileId: string) => Promise<any>;
+  role: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const toast = useToast();
+  const canEdit = role !== "VIEWER";
 
   const handleSaveField = async (name: string, value: string) => {
     await updateNC(nc.id, { [name]: value });
@@ -83,7 +86,7 @@ export default function NCDetailClient({
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-          <ConfirmAction
+          {canEdit && <ConfirmAction
             trigger={
               <button disabled={isPending}
                 style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid #3b82f6", background: "#eff6ff", color: "#3b82f6", cursor: "pointer" }}>
@@ -94,13 +97,13 @@ export default function NCDetailClient({
             confirmLabel="Create CAPA"
             confirmStyle="primary"
             onConfirm={handleSendToCAPA}
-          />
+          />}
           <StatusDropdown
             currentStatus={nc.status}
             options={["OPEN", "UNDER_INVESTIGATION", "CONTAINMENT", "CORRECTIVE_ACTION", "VERIFIED", "CLOSED"]}
             onStatusChange={handleStatusChange}
           />
-          <DeleteButton onDelete={handleDelete} />
+          {canEdit && <DeleteButton onDelete={handleDelete} />}
         </div>
       </div>
 
@@ -210,6 +213,7 @@ export default function NCDetailClient({
               files={evidence}
               uploadAction={uploadEvidence}
               deleteAction={deleteEvidence}
+              readOnly={!canEdit}
             />
           </div>
 

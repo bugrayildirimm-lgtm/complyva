@@ -1,4 +1,4 @@
-import { createCertification, getCertifications } from "../../../lib/api";
+import { createCertification, getCertifications , getCurrentRole } from "../../../lib/api";
 import type { Certification } from "../../../lib/types";
 import ExportButton from "../ExportButton";
 
@@ -11,6 +11,7 @@ export default async function CertificationsPage() {
     return diff > 0 && diff < 60 * 24 * 60 * 60 * 1000;
   }
 
+  const role = await getCurrentRole();
   return (
     <>
       <div className="page-header">
@@ -21,6 +22,7 @@ export default async function CertificationsPage() {
         <ExportButton type="certifications" />
       </div>
 
+      {role !== "VIEWER" && (
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: "#111" }}>Add Certification</div>
         <form action={createCertification} className="form-grid">
@@ -53,6 +55,7 @@ export default async function CertificationsPage() {
           </div>
         </form>
       </div>
+      )}
 
       <div className="table-card">
         <table className="table">

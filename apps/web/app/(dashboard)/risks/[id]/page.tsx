@@ -1,4 +1,4 @@
-import { getRisk, getEvidence, getEntityActivity, getEntityCrossLinks, updateRisk, deleteRisk, uploadEvidence, deleteEvidence } from "../../../../lib/api";
+import { getRisk, getEvidence, getEntityActivity, getEntityCrossLinks, updateRisk, deleteRisk, uploadEvidence, deleteEvidence, getCurrentRole } from "../../../../lib/api";
 import type { Risk } from "../../../../lib/types";
 import RiskDetailClient from "./RiskDetailClient";
 
@@ -11,6 +11,7 @@ export default async function RiskDetailPage({ params }: { params: Promise<{ id:
   let crossLinks: any[] = [];
   try { crossLinks = await getEntityCrossLinks("RISK", id); } catch { crossLinks = []; }
 
+  const role = await getCurrentRole();
   return (
     <RiskDetailClient
       risk={risk}
@@ -21,6 +22,7 @@ export default async function RiskDetailPage({ params }: { params: Promise<{ id:
       deleteRisk={deleteRisk}
       uploadEvidence={uploadEvidence}
       deleteEvidence={deleteEvidence}
+      role={role}
     />
   );
 }

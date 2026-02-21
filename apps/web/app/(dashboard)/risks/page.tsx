@@ -1,10 +1,11 @@
-import { createRisk, getRisks } from "../../../lib/api";
+import { createRisk, getRisks, getCurrentRole } from "../../../lib/api";
 import type { Risk } from "../../../lib/types";
 import RiskListClient from "./RiskListClient";
 import ExportButton from "../ExportButton";
 
 export default async function RisksPage() {
   const rows: Risk[] = await getRisks();
+  const role = await getCurrentRole();
 
   return (
     <>
@@ -16,6 +17,7 @@ export default async function RisksPage() {
         <ExportButton type="risks" />
       </div>
 
+      {role !== "VIEWER" && (
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: "#111" }}>Add Risk</div>
         <form action={createRisk} className="form-grid">
@@ -80,6 +82,7 @@ export default async function RisksPage() {
           </div>
         </form>
       </div>
+      )}
 
       <RiskListClient risks={rows} />
     </>

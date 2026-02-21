@@ -1,4 +1,4 @@
-import { getNonConformity, getAssets, getEvidence, getEntityActivity, getEntityCrossLinks, updateNonConformity, deleteNonConformity, sendNCToCAPA, uploadEvidence, deleteEvidence } from "../../../../lib/api";
+import { getNonConformity, getAssets, getEvidence, getEntityActivity, getEntityCrossLinks, updateNonConformity, deleteNonConformity, sendNCToCAPA, uploadEvidence, deleteEvidence, getCurrentRole } from "../../../../lib/api";
 import type { NonConformity, Asset } from "../../../../lib/types";
 import NCDetailClient from "./NCDetailClient";
 
@@ -12,6 +12,7 @@ export default async function NCDetailPage({ params }: { params: Promise<{ id: s
   let crossLinks: any[] = [];
   try { crossLinks = await getEntityCrossLinks("NC", id); } catch { crossLinks = []; }
 
+  const role = await getCurrentRole();
   return (
     <NCDetailClient
       nc={nc}
@@ -24,6 +25,7 @@ export default async function NCDetailPage({ params }: { params: Promise<{ id: s
       sendNCToCAPA={sendNCToCAPA}
       uploadEvidence={uploadEvidence}
       deleteEvidence={deleteEvidence}
+      role={role}
     />
   );
 }

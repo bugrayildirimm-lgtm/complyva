@@ -1,4 +1,4 @@
-import { createAsset, getAssets } from "../../../lib/api";
+import { createAsset, getAssets , getCurrentRole } from "../../../lib/api";
 import type { Asset } from "../../../lib/types";
 import ExportButton from "../ExportButton";
 
@@ -9,6 +9,7 @@ const CLASS_COLORS: Record<number, string> = { 1: "#22c55e", 2: "#3b82f6", 3: "#
 export default async function AssetsPage() {
   const rows: Asset[] = await getAssets();
 
+  const role = await getCurrentRole();
   return (
     <>
       <div className="page-header">
@@ -19,6 +20,7 @@ export default async function AssetsPage() {
         <ExportButton type="assets" />
       </div>
 
+      {role !== "VIEWER" && (
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: "#111" }}>Register New Asset</div>
         <form action={createAsset} className="form-grid">
@@ -78,6 +80,7 @@ export default async function AssetsPage() {
           </div>
         </form>
       </div>
+      )}
 
       {/* Summary Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 16 }}>

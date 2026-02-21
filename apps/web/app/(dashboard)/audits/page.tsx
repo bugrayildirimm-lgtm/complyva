@@ -1,9 +1,10 @@
-import { createAudit, getAudits } from "../../../lib/api";
+import { createAudit, getAudits, getCurrentRole } from "../../../lib/api";
 import type { Audit } from "../../../lib/types";
 import ExportButton from "../ExportButton";
 
 export default async function AuditsPage() {
   const rows: Audit[] = await getAudits();
+  const role = await getCurrentRole();
 
   return (
     <>
@@ -15,6 +16,7 @@ export default async function AuditsPage() {
         <ExportButton type="audits" />
       </div>
 
+      {role !== "VIEWER" && (
       <div className="card" style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 14, color: "#111" }}>Add Audit</div>
         <form action={createAudit} className="form-grid">
@@ -56,6 +58,7 @@ export default async function AuditsPage() {
           </div>
         </form>
       </div>
+      )}
 
       <div className="table-card">
         <table className="table">

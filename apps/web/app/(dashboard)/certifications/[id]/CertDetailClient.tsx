@@ -20,6 +20,7 @@ export default function CertDetailClient({
   deleteCertification,
   uploadEvidence,
   deleteEvidence,
+  role,
 }: {
   cert: Certification;
   evidence: any[];
@@ -28,6 +29,7 @@ export default function CertDetailClient({
   deleteCertification: (id: string) => Promise<void>;
   uploadEvidence: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
   deleteEvidence: (fileId: string) => Promise<any>;
+  role: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -66,7 +68,7 @@ export default function CertDetailClient({
             options={["ACTIVE", "EXPIRED", "REVOKED", "SUSPENDED"]}
             onStatusChange={handleStatusChange}
           />
-          <DeleteButton onDelete={handleDelete} />
+          {canEdit && <DeleteButton onDelete={handleDelete} />}
         </div>
       </div>
 
@@ -155,6 +157,7 @@ export default function CertDetailClient({
               files={evidence}
               uploadAction={uploadEvidence}
               deleteAction={deleteEvidence}
+              readOnly={!canEdit}
             />
           </div>
 

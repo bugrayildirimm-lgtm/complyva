@@ -1,4 +1,4 @@
-import { getCAPA, getAssets, getEvidence, getEntityActivity, getEntityCrossLinks, updateCAPA, deleteCAPA, uploadEvidence, deleteEvidence } from "../../../../lib/api";
+import { getCAPA, getAssets, getEvidence, getEntityActivity, getEntityCrossLinks, updateCAPA, deleteCAPA, uploadEvidence, deleteEvidence, getCurrentRole } from "../../../../lib/api";
 import type { CAPA, Asset } from "../../../../lib/types";
 import CAPADetailClient from "./CAPADetailClient";
 
@@ -12,6 +12,7 @@ export default async function CAPADetailPage({ params }: { params: Promise<{ id:
   let crossLinks: any[] = [];
   try { crossLinks = await getEntityCrossLinks("CAPA", id); } catch { crossLinks = []; }
 
+  const role = await getCurrentRole();
   return (
     <CAPADetailClient
       capa={capa}
@@ -23,6 +24,7 @@ export default async function CAPADetailPage({ params }: { params: Promise<{ id:
       deleteCAPA={deleteCAPA}
       uploadEvidence={uploadEvidence}
       deleteEvidence={deleteEvidence}
+      role={role}
     />
   );
 }

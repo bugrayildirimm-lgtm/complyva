@@ -24,6 +24,7 @@ export default function IncidentDetailClient({
   sendIncidentToNC,
   uploadEvidence,
   deleteEvidence,
+  role,
 }: {
   incident: Incident;
   assets: Asset[];
@@ -36,10 +37,12 @@ export default function IncidentDetailClient({
   sendIncidentToNC: (id: string) => Promise<any>;
   uploadEvidence: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
   deleteEvidence: (fileId: string) => Promise<any>;
+  role: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const toast = useToast();
+  const canEdit = role !== "VIEWER";
 
   const handleSaveField = async (name: string, value: string) => {
     await updateIncident(incident.id, { [name]: value });
@@ -83,7 +86,7 @@ export default function IncidentDetailClient({
             {incident.category || "Uncategorized"} · Reported by {incident.reported_by || "Unknown"}
           </p>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {canEdit && <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
           <ConfirmAction
             trigger={
               <button disabled={isPending}
@@ -113,8 +116,8 @@ export default function IncidentDetailClient({
             options={["OPEN", "INVESTIGATING", "CONTAINED", "RESOLVED", "CLOSED"]}
             onStatusChange={handleStatusChange}
           />
-          <DeleteButton onDelete={handleDelete} />
-        </div>
+          {canEdit && <DeleteButton onDelete={handleDelete} />}
+        </div>}
       </div>
 
       {/* Summary Cards */}
@@ -214,6 +217,7 @@ export default function IncidentDetailClient({
               files={evidence}
               uploadAction={uploadEvidence}
               deleteAction={deleteEvidence}
+              readOnly={!canEdit}
             />
           </div>
 

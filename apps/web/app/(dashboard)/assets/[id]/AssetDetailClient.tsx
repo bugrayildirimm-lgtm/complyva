@@ -19,6 +19,7 @@ export default function AssetDetailClient({
   deleteAsset,
   uploadEvidence,
   deleteEvidence,
+  role,
 }: {
   asset: Asset;
   evidence: any[];
@@ -27,6 +28,7 @@ export default function AssetDetailClient({
   deleteAsset: (id: string) => Promise<void>;
   uploadEvidence: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
   deleteEvidence: (fileId: string) => Promise<any>;
+  role: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -66,7 +68,7 @@ export default function AssetDetailClient({
             options={["ACTIVE", "UNDER_REVIEW", "DECOMMISSIONED"]}
             onStatusChange={handleStatusChange}
           />
-          <DeleteButton onDelete={handleDelete} />
+          {canEdit && <DeleteButton onDelete={handleDelete} />}
         </div>
       </div>
 
@@ -239,6 +241,7 @@ export default function AssetDetailClient({
               files={evidence}
               uploadAction={uploadEvidence}
               deleteAction={deleteEvidence}
+              readOnly={!canEdit}
             />
           </div>
 

@@ -1,4 +1,4 @@
-import { getChange, getAssets, getEvidence, getEntityActivity, updateChange, deleteChange, uploadEvidence, deleteEvidence } from "../../../../lib/api";
+import { getChange, getAssets, getEvidence, getEntityActivity, updateChange, deleteChange, uploadEvidence, deleteEvidence, getCurrentRole } from "../../../../lib/api";
 import type { Change, Asset } from "../../../../lib/types";
 import ChangeDetailClient from "./ChangeDetailClient";
 
@@ -10,6 +10,7 @@ export default async function ChangeDetailPage({ params }: { params: Promise<{ i
   let activity: any[] = [];
   try { activity = await getEntityActivity("CHANGE", id); } catch { activity = []; }
 
+  const role = await getCurrentRole();
   return (
     <ChangeDetailClient
       change={change}
@@ -20,6 +21,7 @@ export default async function ChangeDetailPage({ params }: { params: Promise<{ i
       deleteChange={deleteChange}
       uploadEvidence={uploadEvidence}
       deleteEvidence={deleteEvidence}
+      role={role}
     />
   );
 }

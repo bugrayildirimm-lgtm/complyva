@@ -19,6 +19,7 @@ export default function ChangeDetailClient({
   deleteChange,
   uploadEvidence,
   deleteEvidence,
+  role,
 }: {
   change: Change;
   assets: any[];
@@ -28,6 +29,7 @@ export default function ChangeDetailClient({
   deleteChange: (id: string) => Promise<void>;
   uploadEvidence: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
   deleteEvidence: (fileId: string) => Promise<any>;
+  role: string;
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -64,7 +66,7 @@ export default function ChangeDetailClient({
             options={["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "IN_PROGRESS", "COMPLETED", "ROLLED_BACK", "CANCELLED"]}
             onStatusChange={handleStatusChange}
           />
-          <DeleteButton onDelete={handleDelete} />
+          {canEdit && <DeleteButton onDelete={handleDelete} />}
         </div>
       </div>
 
@@ -153,6 +155,7 @@ export default function ChangeDetailClient({
               files={evidence}
               uploadAction={uploadEvidence}
               deleteAction={deleteEvidence}
+              readOnly={!canEdit}
             />
           </div>
 
