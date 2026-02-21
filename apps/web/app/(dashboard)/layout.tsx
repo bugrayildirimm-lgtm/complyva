@@ -1,5 +1,6 @@
 import { SignedIn, SignedOut, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 import Sidebar from "../Sidebar";
+import { ToastProvider } from "./Toast";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -24,7 +25,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </SignedIn>
           </div>
         </header>
-        <div className="page-content">{children}</div>
+        <div className="page-content"><ToastProvider>{children}</ToastProvider></div>
       </div>
     </div>
   );
