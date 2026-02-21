@@ -29,7 +29,7 @@ async function getAuthHeaders() {
 
 export async function GET(req: NextRequest) {
   const type = req.nextUrl.searchParams.get("type");
-  if (!type || !["certifications", "risks", "audits"].includes(type)) {
+  if (!type || !["certifications", "risks", "audits", "assets"].includes(type)) {
     return NextResponse.json({ error: "Invalid type" }, { status: 400 });
   }
 
@@ -38,7 +38,6 @@ export async function GET(req: NextRequest) {
   const rows = await res.json();
   if (!res.ok) return NextResponse.json({ error: "Fetch failed" }, { status: 500 });
 
-  // Build CSV (universal, no dependencies needed)
   let csvContent = "";
   const now = new Date().toISOString().slice(0, 10);
 
@@ -46,30 +45,19 @@ export async function GET(req: NextRequest) {
     csvContent = "Name,Framework Type,Issuing Body,Issue Date,Expiry Date,Status,Notes,Created At\n";
     for (const r of rows) {
       csvContent += [
-        esc(r.name),
-        esc(r.framework_type),
-        esc(r.issuing_body),
+        esc(r.name), esc(r.framework_type), esc(r.issuing_body),
         r.issue_date ? String(r.issue_date).slice(0, 10) : "",
         r.expiry_date ? String(r.expiry_date).slice(0, 10) : "",
-        r.status,
-        esc(r.notes),
-        String(r.created_at).slice(0, 10),
+        r.status, esc(r.notes), String(r.created_at).slice(0, 10),
       ].join(",") + "\n";
     }
   } else if (type === "risks") {
     csvContent = "Title,Category,Likelihood,Impact,Inherent Score,Residual Likelihood,Residual Impact,Residual Score,Status,Treatment Plan,Due Date,Created At\n";
     for (const r of rows) {
       csvContent += [
-        esc(r.title),
-        esc(r.category),
-        r.likelihood,
-        r.impact,
-        r.inherent_score,
-        r.residual_likelihood ?? "",
-        r.residual_impact ?? "",
-        r.residual_score ?? "",
-        r.status,
-        esc(r.treatment_plan),
+        esc(r.title), esc(r.category), r.likelihood, r.impact, r.inherent_score,
+        r.residual_likelihood ?? "", r.residual_impact ?? "", r.residual_score ?? "",
+        r.status, esc(r.treatment_plan),
         r.due_date ? String(r.due_date).slice(0, 10) : "",
         String(r.created_at).slice(0, 10),
       ].join(",") + "\n";
@@ -78,13 +66,21 @@ export async function GET(req: NextRequest) {
     csvContent = "Title,Type,Auditor,Scope,Start Date,End Date,Status,Created At\n";
     for (const r of rows) {
       csvContent += [
-        esc(r.title),
-        r.type,
-        esc(r.auditor),
-        esc(r.scope),
+        esc(r.title), r.type, esc(r.auditor), esc(r.scope),
         r.start_date ? String(r.start_date).slice(0, 10) : "",
         r.end_date ? String(r.end_date).slice(0, 10) : "",
+        r.status, String(r.created_at).slice(0, 10),
+      ].join(",") + "\n";
+    }
+  } else if (type === "assets") {
+    csvContent = "Name,Asset Type,Category,Owner,BIA Score,DCA Score,Combined Classification,Status,Review Date,Description,Notes,Created At\n";
+    for (const r of rows) {
+      csvContent += [
+        esc(r.name), r.asset_type, esc(r.category), esc(r.owner),
+        r.bia_score ?? "", r.dca_score ?? "", r.combined_classification ?? "",
         r.status,
+        r.review_date ? String(r.review_date).slice(0, 10) : "",
+        esc(r.description), esc(r.notes),
         String(r.created_at).slice(0, 10),
       ].join(",") + "\n";
     }

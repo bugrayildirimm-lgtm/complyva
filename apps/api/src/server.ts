@@ -40,6 +40,7 @@ app.get("/", async () => ({
     "/evidence (GET, POST, DELETE)",
     "/alerts/run (POST)",
     "/alerts/digest (POST)",
+    "/assets (GET, POST, PUT, DELETE)",
     "/activity (GET)",
   ],
 }));
@@ -650,6 +651,101 @@ app.get("/activity/:entityType/:entityId", async (req) => {
     [orgId, entityType.toUpperCase(), entityId]
   );
   return r.rows;
+});
+
+// =======================
+// Assets
+// =======================
+const AssetSchema = z.object({
+  name: z.string().min(2).max(200),
+  description: z.string().max(5000).optional(),
+  category: z.string().max(200).optional(),
+  assetType: z.enum(["PRODUCT", "SYSTEM", "STUDIO", "DATA", "PEOPLE", "FACILITY"]),
+  owner: z.string().max(200).optional(),
+  biaScore: z.number().int().min(1).max(4).optional(),
+  dcaScore: z.number().int().min(1).max(4).optional(),
+  status: z.enum(["ACTIVE", "UNDER_REVIEW", "DECOMMISSIONED"]).optional(),
+  reviewDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  notes: z.string().max(5000).optional(),
+});
+
+app.get("/assets", async (req) => {
+  const { orgId } = getAuth(req);
+  const r = await pool.query(
+    `SELECT * FROM assets WHERE org_id = $1 ORDER BY created_at DESC LIMIT 200`,
+    [orgId]
+  );
+  return r.rows;
+});
+
+app.get("/assets/:id", async (req) => {
+  const { orgId } = getAuth(req);
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `SELECT * FROM assets WHERE id = $1 AND org_id = $2`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  return r.rows[0];
+});
+
+app.post("/assets", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const p = AssetSchema.parse(cleanBody(req.body));
+  const r = await pool.query(
+    `INSERT INTO assets (org_id, name, description, category, asset_type, owner, bia_score, dca_score, status, review_date, notes, owner_user_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *`,
+    [orgId, p.name, p.description ?? null, p.category ?? null, p.assetType, p.owner ?? null,
+     p.biaScore ?? null, p.dcaScore ?? null, p.status ?? "ACTIVE", p.reviewDate ?? null, p.notes ?? null, userId]
+  );
+  await logActivity(orgId, userId, "CREATED", "ASSET", r.rows[0].id, p.name, `Type: ${p.assetType}`);
+  return r.rows[0];
+});
+
+app.put("/assets/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const p = AssetSchema.partial().parse(cleanBody(req.body));
+  const fields: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (p.name !== undefined) { fields.push(`name = $${idx++}`); values.push(p.name); }
+  if (p.description !== undefined) { fields.push(`description = $${idx++}`); values.push(p.description); }
+  if (p.category !== undefined) { fields.push(`category = $${idx++}`); values.push(p.category); }
+  if (p.assetType !== undefined) { fields.push(`asset_type = $${idx++}`); values.push(p.assetType); }
+  if (p.owner !== undefined) { fields.push(`owner = $${idx++}`); values.push(p.owner); }
+  if (p.biaScore !== undefined) { fields.push(`bia_score = $${idx++}`); values.push(p.biaScore); }
+  if (p.dcaScore !== undefined) { fields.push(`dca_score = $${idx++}`); values.push(p.dcaScore); }
+  if (p.status !== undefined) { fields.push(`status = $${idx++}`); values.push(p.status); }
+  if (p.reviewDate !== undefined) { fields.push(`review_date = $${idx++}`); values.push(p.reviewDate); }
+  if (p.notes !== undefined) { fields.push(`notes = $${idx++}`); values.push(p.notes); }
+
+  if (fields.length === 0) throw new Error("No fields to update");
+  values.push(id, orgId);
+
+  const r = await pool.query(
+    `UPDATE assets SET ${fields.join(", ")} WHERE id = $${idx++} AND org_id = $${idx} RETURNING *`,
+    values
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "UPDATED", "ASSET", id, r.rows[0].name, `Fields: ${Object.keys(p).join(", ")}`);
+  return r.rows[0];
+});
+
+app.delete("/assets/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `DELETE FROM assets WHERE id = $1 AND org_id = $2 RETURNING *`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "DELETED", "ASSET", id, r.rows[0].name);
+  return { deleted: true };
 });
 
 // =======================

@@ -70,6 +70,25 @@ export type EvidenceFile = {
   uploaded_at: string;
 };
 
+export type Asset = {
+  id: string;
+  org_id: string;
+  name: string;
+  description: string | null;
+  category: string | null;
+  asset_type: string;
+  owner: string | null;
+  bia_score: number | null;
+  dca_score: number | null;
+  combined_classification: number | null;
+  status: string;
+  review_date: string | null;
+  notes: string | null;
+  owner_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ActivityLog = {
   id: string;
   action: string;

@@ -274,6 +274,59 @@ export async function sendFindingToRisk(findingId: string) {
   return result;
 }
 
+// ========== Assets ==========
+export async function getAssets() {
+  return apiFetch("/assets");
+}
+
+export async function getAsset(id: string) {
+  return apiFetch(`/assets/${id}`);
+}
+
+export async function createAsset(formData: FormData) {
+  "use server";
+  const name = String(formData.get("name") ?? "").trim();
+  if (name.length < 2) { redirect("/assets"); return; }
+
+  await apiFetch("/assets", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      name,
+      description: str(formData, "description"),
+      category: str(formData, "category"),
+      assetType: String(formData.get("assetType") ?? "SYSTEM"),
+      owner: str(formData, "owner"),
+      biaScore: formData.get("biaScore") ? num(formData, "biaScore", 1) : undefined,
+      dcaScore: formData.get("dcaScore") ? num(formData, "dcaScore", 1) : undefined,
+      reviewDate: str(formData, "reviewDate"),
+      notes: str(formData, "notes"),
+    }),
+  });
+
+  revalidatePath("/assets");
+  revalidatePath("/dashboard");
+}
+
+export async function updateAsset(id: string, data: Record<string, any>) {
+  "use server";
+  await apiFetch(`/assets/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  revalidatePath(`/assets/${id}`);
+  revalidatePath("/assets");
+  revalidatePath("/dashboard");
+}
+
+export async function deleteAsset(id: string) {
+  "use server";
+  await apiFetch(`/assets/${id}`, { method: "DELETE" });
+  revalidatePath("/assets");
+  revalidatePath("/dashboard");
+}
+
 // ========== Evidence Files ==========
 export async function uploadEvidence(entityType: string, entityId: string, formData: FormData) {
   "use server";
