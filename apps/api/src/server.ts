@@ -63,15 +63,39 @@ app.get("/debug/tables", async () => {
 app.get("/dashboard/summary", async (req) => {
   const { orgId } = getAuth(req);
 
+  // Certifications
   const expiringSoon = await pool.query(
     `select count(*)::int as count from certifications
      where org_id = $1 and expiry_date is not null
        and expiry_date <= (current_date + interval '60 days') and status = 'ACTIVE'`,
     [orgId]
   );
+  const totalCerts = await pool.query(
+    `select count(*)::int as count from certifications where org_id = $1`, [orgId]
+  );
+
+  // Risks
   const openRisks = await pool.query(
     `select count(*)::int as count from risks
      where org_id = $1 and status in ('OPEN','IN_TREATMENT')`,
+    [orgId]
+  );
+  const pendingRisks = await pool.query(
+    `select count(*)::int as count from risks where org_id = $1 and status = 'PENDING_REVIEW'`, [orgId]
+  );
+  const risksByLevel = await pool.query(
+    `select
+       count(*) filter (where inherent_score >= 20)::int as critical,
+       count(*) filter (where inherent_score >= 10 and inherent_score < 20)::int as high,
+       count(*) filter (where inherent_score >= 5 and inherent_score < 10)::int as medium,
+       count(*) filter (where inherent_score < 5)::int as low
+     from risks where org_id = $1 and status in ('OPEN','IN_TREATMENT','PENDING_REVIEW')`, [orgId]
+  );
+
+  // Audits
+  const activeAudits = await pool.query(
+    `select count(*)::int as count from audits
+     where org_id = $1 and status = 'IN_PROGRESS'`,
     [orgId]
   );
   const openFindings = await pool.query(
@@ -79,29 +103,87 @@ app.get("/dashboard/summary", async (req) => {
      where org_id = $1 and status in ('OPEN','IN_PROGRESS')`,
     [orgId]
   );
-  const activeAudits = await pool.query(
-    `select count(*)::int as count from audits
-     where org_id = $1 and status = 'IN_PROGRESS'`,
-    [orgId]
+
+  // Assets
+  const totalAssets = await pool.query(
+    `select count(*)::int as count from assets where org_id = $1`, [orgId]
   );
-  const recentRisks = await pool.query(
+  const criticalAssets = await pool.query(
+    `select count(*)::int as count from assets where org_id = $1 and combined_classification >= 3`, [orgId]
+  );
+
+  // Incidents
+  const openIncidents = await pool.query(
+    `select count(*)::int as count from incidents where org_id = $1 and status in ('OPEN','INVESTIGATING','CONTAINED')`, [orgId]
+  );
+  const criticalIncidents = await pool.query(
+    `select count(*)::int as count from incidents where org_id = $1 and severity = 'CRITICAL' and status != 'CLOSED'`, [orgId]
+  );
+
+  // Changes
+  const pendingChanges = await pool.query(
+    `select count(*)::int as count from changes where org_id = $1 and status in ('DRAFT','SUBMITTED')`, [orgId]
+  );
+  const activeChanges = await pool.query(
+    `select count(*)::int as count from changes where org_id = $1 and status in ('APPROVED','IN_PROGRESS')`, [orgId]
+  );
+
+  // Non-Conformities
+  const openNCs = await pool.query(
+    `select count(*)::int as count from nonconformities where org_id = $1 and status not in ('VERIFIED','CLOSED')`, [orgId]
+  );
+  const overdueNCs = await pool.query(
+    `select count(*)::int as count from nonconformities where org_id = $1 and due_date < current_date and status not in ('VERIFIED','CLOSED')`, [orgId]
+  );
+
+  // CAPAs
+  const openCAPAs = await pool.query(
+    `select count(*)::int as count from capas where org_id = $1 and status not in ('CLOSED')`, [orgId]
+  );
+  const overdueCAPAs = await pool.query(
+    `select count(*)::int as count from capas where org_id = $1 and due_date < current_date and status not in ('CLOSED')`, [orgId]
+  );
+  const ineffectiveCAPAs = await pool.query(
+    `select count(*)::int as count from capas where org_id = $1 and effectiveness_status = 'NOT_EFFECTIVE'`, [orgId]
+  );
+
+
+  // Top risks
+  const topRisks = await pool.query(
     `select id, title, category, likelihood, impact, inherent_score, status
-     from risks where org_id = $1 order by created_at desc limit 5`,
-    [orgId]
-  );
-  const upcomingAudits = await pool.query(
-    `select id, title, type, status, start_date
-     from audits where org_id = $1 order by created_at desc limit 5`,
-    [orgId]
+     from risks where org_id = $1 and status in ('OPEN','IN_TREATMENT')
+     order by inherent_score desc limit 5`, [orgId]
   );
 
   return {
+    // Certifications
     expiringSoon: expiringSoon.rows[0]?.count ?? 0,
+    totalCerts: totalCerts.rows[0]?.count ?? 0,
+    // Risks
     openRisks: openRisks.rows[0]?.count ?? 0,
-    openFindings: openFindings.rows[0]?.count ?? 0,
+    pendingRisks: pendingRisks.rows[0]?.count ?? 0,
+    risksByLevel: risksByLevel.rows[0] ?? { critical: 0, high: 0, medium: 0, low: 0 },
+    // Audits
     activeAudits: activeAudits.rows[0]?.count ?? 0,
-    recentRisks: recentRisks.rows,
-    upcomingAudits: upcomingAudits.rows,
+    openFindings: openFindings.rows[0]?.count ?? 0,
+    // Assets
+    totalAssets: totalAssets.rows[0]?.count ?? 0,
+    criticalAssets: criticalAssets.rows[0]?.count ?? 0,
+    // Incidents
+    openIncidents: openIncidents.rows[0]?.count ?? 0,
+    criticalIncidents: criticalIncidents.rows[0]?.count ?? 0,
+    // Changes
+    pendingChanges: pendingChanges.rows[0]?.count ?? 0,
+    activeChanges: activeChanges.rows[0]?.count ?? 0,
+    // NCs
+    openNCs: openNCs.rows[0]?.count ?? 0,
+    overdueNCs: overdueNCs.rows[0]?.count ?? 0,
+    // CAPAs
+    openCAPAs: openCAPAs.rows[0]?.count ?? 0,
+    overdueCAPAs: overdueCAPAs.rows[0]?.count ?? 0,
+    ineffectiveCAPAs: ineffectiveCAPAs.rows[0]?.count ?? 0,
+    // Lists
+    topRisks: topRisks.rows,
   };
 });
 
