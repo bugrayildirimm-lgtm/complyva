@@ -14,7 +14,7 @@ const ENTITY_LABELS: Record<string, string> = {
 };
 
 const ENTITY_PATHS: Record<string, string> = {
-  FINDING: "/audits", INCIDENT: "/incidents", NC: "/nonconformities",
+  INCIDENT: "/incidents", NC: "/nonconformities",
   RISK: "/risks", CAPA: "/capas", AUDIT: "/audits", ASSET: "/assets",
   CERTIFICATION: "/certifications", CHANGE: "/changes",
 };
@@ -28,7 +28,7 @@ export default function LinkedItemsPanel({
   entityId: string;
   links: CrossLink[];
 }) {
-  if (links.length === 0) {
+  if (!links || links.length === 0) {
     return (
       <div style={{ textAlign: "center", padding: "40px 24px" }}>
         <div style={{ fontSize: 36, marginBottom: 8 }}>🔗</div>
@@ -83,14 +83,17 @@ function LinkCard({ link, side }: { link: CrossLink; side: "source" | "target" }
   const title = side === "target" ? link.target_title : link.source_title;
   const icon = ENTITY_ICONS[type] || "📌";
   const label = ENTITY_LABELS[type] || type;
-  const path = ENTITY_PATHS[type] || "/";
-  const href = `${path}/${id}`;
+  const path = ENTITY_PATHS[type];
+  const href = path ? `${path}/${id}` : null;
 
   const directionLabel = side === "target" ? "→" : "←";
   const directionColor = side === "target" ? "#3b82f6" : "#8b5cf6";
 
+  const Wrapper = href ? "a" : "div";
+  const wrapperProps = href ? { href, style: { textDecoration: "none" } } : {};
+
   return (
-    <a href={href} style={{ textDecoration: "none" }}>
+    <Wrapper {...wrapperProps as any}>
       <div style={{
         border: "1px solid #e5e7eb",
         borderRadius: 8,
@@ -100,13 +103,15 @@ function LinkCard({ link, side }: { link: CrossLink; side: "source" | "target" }
         justifyContent: "space-between",
         background: "#fff",
         transition: "border-color 0.15s, box-shadow 0.15s",
-        cursor: "pointer",
+        cursor: href ? "pointer" : "default",
       }}
         onMouseEnter={(e) => {
+          if (!href) return;
           e.currentTarget.style.borderColor = directionColor;
           e.currentTarget.style.boxShadow = `0 0 0 1px ${directionColor}20`;
         }}
         onMouseLeave={(e) => {
+          if (!href) return;
           e.currentTarget.style.borderColor = "#e5e7eb";
           e.currentTarget.style.boxShadow = "none";
         }}
@@ -143,10 +148,12 @@ function LinkCard({ link, side }: { link: CrossLink; side: "source" | "target" }
         </div>
 
         {/* Open arrow */}
-        <div style={{ fontSize: 13, color: "#9ca3af", flexShrink: 0, marginLeft: 8 }}>
-          Open →
-        </div>
+        {href && (
+          <div style={{ fontSize: 13, color: "#9ca3af", flexShrink: 0, marginLeft: 8 }}>
+            Open →
+          </div>
+        )}
       </div>
-    </a>
+    </Wrapper>
   );
 }

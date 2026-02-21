@@ -640,6 +640,11 @@ export async function getEntityActivity(entityType: string, entityId: string) {
   return apiFetch(`/activity/${entityType}/${entityId}`);
 }
 
+// ========== Cross-Links (entity-specific) ==========
+export async function getEntityCrossLinks(entityType: string, entityId: string) {
+  return apiFetch(`/cross-links/${entityType}/${entityId}`);
+}
+
 // ========== Phase E: Enhanced Dashboard & Cross-Links ==========
 
 export async function getEnhancedDashboard() {

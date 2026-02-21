@@ -1410,6 +1410,33 @@ setInterval(() => {
   if (now.getDay() === 1 && now.getHours() === 8) sendWeeklyDigest().catch(console.error);
 }, 60 * 60 * 1000);
 
+// =======================
+// Cross-Links
+// =======================
+app.get("/cross-links/:entityType/:entityId", async (req) => {
+  const { orgId } = getAuth(req);
+  const { entityType, entityId } = req.params as { entityType: string; entityId: string };
+  const r = await pool.query(
+    `SELECT * FROM cross_links
+     WHERE org_id = $1 AND (
+       (source_type = $2 AND source_id = $3) OR
+       (target_type = $2 AND target_id = $3)
+     )
+     ORDER BY created_at DESC`,
+    [orgId, entityType, entityId]
+  );
+  return r.rows;
+});
+
+app.get("/cross-links", async (req) => {
+  const { orgId } = getAuth(req);
+  const r = await pool.query(
+    `SELECT * FROM cross_links WHERE org_id = $1 ORDER BY created_at DESC LIMIT 200`,
+    [orgId]
+  );
+  return r.rows;
+});
+
 // --- Error handler ---
 app.setErrorHandler((err, _req, reply) => {
   const msg = err instanceof Error ? err.message : "Unknown error";

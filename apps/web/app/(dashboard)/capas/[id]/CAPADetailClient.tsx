@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Tabs, InlineEdit, DeleteButton, StatusDropdown } from "../../ActionComponents";
 import EvidencePanel from "../../EvidencePanel";
+import LinkedItemsPanel from "../../LinkedItemsPanel";
 import type { CAPA } from "../../../../lib/types";
 
 const PRIO_COLORS: Record<string, string> = { CRITICAL: "#ef4444", HIGH: "#f59e0b", MEDIUM: "#3b82f6", LOW: "#22c55e" };
@@ -32,6 +33,7 @@ export default function CAPADetailClient({
   assets,
   evidence,
   activity,
+  crossLinks,
   updateCAPA,
   deleteCAPA,
   uploadEvidence,
@@ -41,6 +43,7 @@ export default function CAPADetailClient({
   assets: any[];
   evidence: any[];
   activity: any[];
+  crossLinks: any[];
   updateCAPA: (id: string, data: Record<string, any>) => Promise<void>;
   deleteCAPA: (id: string) => Promise<void>;
   uploadEvidence: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
@@ -181,7 +184,7 @@ export default function CAPADetailClient({
 
       {/* Tabs */}
       <div className="card">
-        <Tabs tabs={["Details", "Investigation", "Action & Verification", "Closure", "Evidence", "Activity"]}>
+        <Tabs tabs={["Details", "Investigation", "Action & Verification", "Closure", "Evidence", "Linked Items", "Activity"]}>
           {/* Details Tab */}
           <div>
             <InlineEdit label="Title" name="title" value={capa.title} onSave={handleSaveField} />
@@ -283,6 +286,11 @@ export default function CAPADetailClient({
               uploadAction={uploadEvidence}
               deleteAction={deleteEvidence}
             />
+          </div>
+
+          {/* Linked Items Tab */}
+          <div>
+            <LinkedItemsPanel entityType="CAPA" entityId={capa.id} links={crossLinks} />
           </div>
 
           {/* Activity Tab */}

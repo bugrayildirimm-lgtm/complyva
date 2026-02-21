@@ -4,6 +4,7 @@ import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Tabs, InlineEdit, DeleteButton, StatusDropdown, ConfirmAction } from "../../ActionComponents";
 import EvidencePanel from "../../EvidencePanel";
+import LinkedItemsPanel from "../../LinkedItemsPanel";
 import { useToast } from "../../Toast";
 import type { NonConformity } from "../../../../lib/types";
 
@@ -23,6 +24,7 @@ export default function NCDetailClient({
   assets,
   evidence,
   activity,
+  crossLinks,
   updateNC,
   deleteNC,
   sendNCToCAPA,
@@ -33,6 +35,7 @@ export default function NCDetailClient({
   assets: any[];
   evidence: any[];
   activity: any[];
+  crossLinks: any[];
   updateNC: (id: string, data: Record<string, any>) => Promise<void>;
   deleteNC: (id: string) => Promise<void>;
   sendNCToCAPA: (id: string) => Promise<any>;
@@ -177,7 +180,7 @@ export default function NCDetailClient({
 
       {/* Tabs */}
       <div className="card">
-        <Tabs tabs={["Details", "Investigation", "Evidence", "Activity"]}>
+        <Tabs tabs={["Details", "Investigation", "Evidence", "Linked Items", "Activity"]}>
           {/* Details Tab */}
           <div>
             <InlineEdit label="Title" name="title" value={nc.title} onSave={handleSaveField} required />
@@ -208,6 +211,11 @@ export default function NCDetailClient({
               uploadAction={uploadEvidence}
               deleteAction={deleteEvidence}
             />
+          </div>
+
+          {/* Linked Items Tab */}
+          <div>
+            <LinkedItemsPanel entityType="NC" entityId={nc.id} links={crossLinks} />
           </div>
 
           {/* Activity Tab */}

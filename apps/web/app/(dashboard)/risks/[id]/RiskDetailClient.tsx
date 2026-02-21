@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Tabs, InlineEdit, DeleteButton, StatusDropdown } from "../../ActionComponents";
 import EvidencePanel from "../../EvidencePanel";
+import LinkedItemsPanel from "../../LinkedItemsPanel";
 import type { Risk } from "../../../../lib/types";
 
 function scoreClass(score: number) {
@@ -51,6 +52,7 @@ export default function RiskDetailClient({
   risk,
   evidence,
   activity,
+  crossLinks,
   updateRisk,
   deleteRisk,
   uploadEvidence,
@@ -59,6 +61,7 @@ export default function RiskDetailClient({
   risk: Risk;
   evidence: any[];
   activity: any[];
+  crossLinks: any[];
   updateRisk: (id: string, data: Record<string, any>) => Promise<void>;
   deleteRisk: (id: string) => Promise<void>;
   uploadEvidence: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
@@ -201,7 +204,7 @@ export default function RiskDetailClient({
 
       {/* Tabs */}
       <div className="card">
-        <Tabs tabs={["Details", "Scoring", "Heat Map", "Evidence", "Activity"]}>
+        <Tabs tabs={["Details", "Scoring", "Heat Map", "Evidence", "Linked Items", "Activity"]}>
           {/* Details Tab */}
           <div>
             <InlineEdit label="Title" name="title" value={risk.title} onSave={handleSaveField} />
@@ -477,6 +480,11 @@ export default function RiskDetailClient({
               uploadAction={uploadEvidence}
               deleteAction={deleteEvidence}
             />
+          </div>
+
+          {/* Linked Items Tab */}
+          <div>
+            <LinkedItemsPanel entityType="RISK" entityId={risk.id} links={crossLinks} />
           </div>
 
           {/* Activity Tab */}

@@ -3,6 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Tabs, InlineEdit, DeleteButton, StatusDropdown, ConfirmAction } from "../../ActionComponents";
+import LinkedItemsPanel from "../../LinkedItemsPanel";
 import EvidencePanel from "../../EvidencePanel";
 import { useToast } from "../../Toast";
 import type { Incident, Asset } from "../../../../lib/types";
@@ -16,6 +17,7 @@ export default function IncidentDetailClient({
   assets,
   evidence,
   activity,
+  crossLinks,
   updateIncident,
   deleteIncident,
   sendIncidentToRisk,
@@ -27,6 +29,7 @@ export default function IncidentDetailClient({
   assets: Asset[];
   evidence: any[];
   activity: any[];
+  crossLinks: any[];
   updateIncident: (id: string, data: Record<string, any>) => Promise<void>;
   deleteIncident: (id: string) => Promise<void>;
   sendIncidentToRisk: (id: string) => Promise<any>;
@@ -148,7 +151,7 @@ export default function IncidentDetailClient({
 
       {/* Tabs */}
       <div className="card">
-        <Tabs tabs={["Details", "Investigation", "Evidence", "Activity"]}>
+        <Tabs tabs={["Details", "Investigation", "Evidence", "Linked Items", "Activity"]}>
           {/* Details Tab */}
           <div>
             <InlineEdit label="Title" name="title" value={incident.title} onSave={handleSaveField} required />
@@ -212,6 +215,11 @@ export default function IncidentDetailClient({
               uploadAction={uploadEvidence}
               deleteAction={deleteEvidence}
             />
+          </div>
+
+          {/* Linked Items Tab */}
+          <div>
+            <LinkedItemsPanel entityType="INCIDENT" entityId={incident.id} links={crossLinks} />
           </div>
 
           {/* Activity Tab */}
