@@ -7,7 +7,7 @@ export default function ExportButton({ type }: { type: string }) {
       className="btn btn-secondary"
       style={{ padding: "6px 14px", fontSize: 12, textDecoration: "none", display: "inline-flex", alignItems: "center", gap: 4 }}
     >
-      ↓ Export CSV
+      ↓ Export Excel
     </a>
   );
 }
