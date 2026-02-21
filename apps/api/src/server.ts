@@ -613,6 +613,11 @@ app.post("/findings/:id/send-to-risk", async (req) => {
   );
 
   await logActivity(orgId, userId, "SENT_TO_RISK", "FINDING", id, finding.title, `Created Risk: ${r.rows[0].id}`);
+  await pool.query(
+    `INSERT INTO cross_links (org_id, source_type, source_id, source_title, target_type, target_id, target_title, link_type, created_by)
+     VALUES ($1,'FINDING',$2,$3,'RISK',$4,$5,'GENERATED',$6)`,
+    [orgId, id, finding.title, r.rows[0].id, r.rows[0].title, userId]
+  );
   return r.rows[0];
 });
 
@@ -984,6 +989,11 @@ app.post("/incidents/:id/send-to-risk", async (req) => {
      "Incident", score, score, inherentScore, userId, inc.corrective_action || null]
   );
   await logActivity(orgId, userId, "SENT_TO_RISK", "INCIDENT", id, inc.title, `Created Risk: ${r.rows[0].id}`);
+  await pool.query(
+    `INSERT INTO cross_links (org_id, source_type, source_id, source_title, target_type, target_id, target_title, link_type, created_by)
+     VALUES ($1,'INCIDENT',$2,$3,'RISK',$4,$5,'GENERATED',$6)`,
+    [orgId, id, inc.title, r.rows[0].id, r.rows[0].title, userId]
+  );
   return r.rows[0];
 });
 
@@ -1002,6 +1012,11 @@ app.post("/incidents/:id/send-to-nc", async (req) => {
      id, sevMap[inc.severity] ?? "MINOR", inc.asset_id || null, inc.root_cause || null, inc.reported_by || null]
   );
   await logActivity(orgId, userId, "SENT_TO_NC", "INCIDENT", id, inc.title, `Created NC: ${r.rows[0].id}`);
+  await pool.query(
+    `INSERT INTO cross_links (org_id, source_type, source_id, source_title, target_type, target_id, target_title, link_type, created_by)
+     VALUES ($1,'INCIDENT',$2,$3,'NC',$4,$5,'GENERATED',$6)`,
+    [orgId, id, inc.title, r.rows[0].id, r.rows[0].title, userId]
+  );
   return r.rows[0];
 });
 
@@ -1023,6 +1038,11 @@ app.post("/nonconformities/:id/send-to-capa", async (req) => {
      nc.raised_by || null, nc.assigned_to || null, sevMap[nc.severity] ?? "MEDIUM", userId]
   );
   await logActivity(orgId, userId, "SENT_TO_CAPA", "NC", id, nc.title, `Created CAPA: ${r.rows[0].id}`);
+  await pool.query(
+    `INSERT INTO cross_links (org_id, source_type, source_id, source_title, target_type, target_id, target_title, link_type, created_by)
+     VALUES ($1,'NC',$2,$3,'CAPA',$4,$5,'GENERATED',$6)`,
+    [orgId, id, nc.title, r.rows[0].id, r.rows[0].title, userId]
+  );
   return r.rows[0];
 });
 

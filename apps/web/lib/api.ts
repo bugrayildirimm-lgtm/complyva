@@ -639,3 +639,36 @@ export async function getActivity() {
 export async function getEntityActivity(entityType: string, entityId: string) {
   return apiFetch(`/activity/${entityType}/${entityId}`);
 }
+
+// ========== Phase E: Enhanced Dashboard & Cross-Links ==========
+
+export async function getEnhancedDashboard() {
+  return apiFetch("/dashboard/enhanced");
+}
+
+export async function getCrossLinks() {
+  return apiFetch("/cross-links");
+}
+
+export async function createCrossLink(data: {
+  sourceType: string;
+  sourceId: string;
+  sourceTitle?: string;
+  targetType: string;
+  targetId: string;
+  targetTitle?: string;
+}) {
+  "use server";
+  await apiFetch("/cross-links", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  revalidatePath("/dashboard");
+}
+
+export async function deleteCrossLink(id: string) {
+  "use server";
+  await apiFetch(`/cross-links/${id}`, { method: "DELETE" });
+  revalidatePath("/dashboard");
+}

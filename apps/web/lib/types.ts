@@ -206,3 +206,68 @@ export type ActivityLog = {
   email: string | null;
   created_at: string;
 };
+
+// ========== Phase E: Cross-Links & Enhanced Dashboard ==========
+
+export type CrossLink = {
+  id: string;
+  org_id: string;
+  source_type: string;
+  source_id: string;
+  source_title: string | null;
+  target_type: string;
+  target_id: string;
+  target_title: string | null;
+  link_type: "GENERATED" | "MANUAL";
+  created_by: string | null;
+  created_at: string;
+};
+
+export type TrendPoint = {
+  month: string;
+  label: string;
+  count: number;
+};
+
+export type DashboardKPIs = {
+  mttr: number | null;
+  capaEffectivenessRate: number | null;
+  capaEffective: number;
+  capaTotal: number;
+  totalOverdue: number;
+  overdueNCs: number;
+  overdueCAPAs: number;
+  overdueRisks: number;
+  overdueFindings: number;
+  riskTreatmentRate: number | null;
+  riskTreated: number;
+  riskTotal: number;
+  auditCompletionRate: number | null;
+  auditCompleted: number;
+  auditTotal: number;
+  ncClosureRate: number | null;
+  ncClosed: number;
+  ncTotal: number;
+};
+
+export type DashboardKRIs = {
+  highRisks: number;
+  recentCriticalIncidents: number;
+  expiredCerts: number;
+  weakControls: number;
+};
+
+export type DashboardTrends = {
+  incidents: TrendPoint[];
+  risks: TrendPoint[];
+  ncs: TrendPoint[];
+  capas: TrendPoint[];
+};
+
+export type DashboardEnhanced = {
+  kpis: DashboardKPIs;
+  kris: DashboardKRIs;
+  trends: DashboardTrends;
+  recentLinks: CrossLink[];
+  recentActivity: ActivityLog[];
+};
