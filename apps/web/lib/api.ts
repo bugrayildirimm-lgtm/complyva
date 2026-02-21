@@ -373,6 +373,17 @@ export async function updateIncident(id: string, data: Record<string, any>) {
   revalidatePath("/dashboard");
 }
 
+export async function sendIncidentToRisk(incidentId: string) {
+  "use server";
+  const result = await apiFetch(`/incidents/${incidentId}/send-to-risk`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  revalidatePath("/risks");
+  revalidatePath("/incidents");
+  return result;
+}
 export async function deleteIncident(id: string) {
   "use server";
   await apiFetch(`/incidents/${id}`, { method: "DELETE" });
