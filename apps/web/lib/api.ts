@@ -373,21 +373,63 @@ export async function updateIncident(id: string, data: Record<string, any>) {
   revalidatePath("/dashboard");
 }
 
-export async function sendIncidentToRisk(incidentId: string) {
-  "use server";
-  const result = await apiFetch(`/incidents/${incidentId}/send-to-risk`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: "{}",
-  });
-  revalidatePath("/risks");
-  revalidatePath("/incidents");
-  return result;
-}
 export async function deleteIncident(id: string) {
   "use server";
   await apiFetch(`/incidents/${id}`, { method: "DELETE" });
   revalidatePath("/incidents");
+  revalidatePath("/dashboard");
+}
+
+// ========== Changes ==========
+export async function getChanges() {
+  return apiFetch("/changes");
+}
+
+export async function getChange(id: string) {
+  return apiFetch(`/changes/${id}`);
+}
+
+export async function createChange(formData: FormData) {
+  "use server";
+  const title = String(formData.get("title") ?? "").trim();
+  if (title.length < 2) { redirect("/changes"); return; }
+
+  await apiFetch("/changes", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title,
+      description: str(formData, "description"),
+      changeType: String(formData.get("changeType") ?? "STANDARD"),
+      priority: String(formData.get("priority") ?? "MEDIUM"),
+      assetId: str(formData, "assetId") || undefined,
+      justification: str(formData, "justification"),
+      plannedStart: str(formData, "plannedStart"),
+      plannedEnd: str(formData, "plannedEnd"),
+      requestedBy: str(formData, "requestedBy"),
+    }),
+  });
+
+  revalidatePath("/changes");
+  revalidatePath("/dashboard");
+}
+
+export async function updateChange(id: string, data: Record<string, any>) {
+  "use server";
+  await apiFetch(`/changes/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  revalidatePath(`/changes/${id}`);
+  revalidatePath("/changes");
+  revalidatePath("/dashboard");
+}
+
+export async function deleteChange(id: string) {
+  "use server";
+  await apiFetch(`/changes/${id}`, { method: "DELETE" });
+  revalidatePath("/changes");
   revalidatePath("/dashboard");
 }
 

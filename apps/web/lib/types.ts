@@ -112,6 +112,32 @@ export type Incident = {
   updated_at: string;
 };
 
+export type Change = {
+  id: string;
+  org_id: string;
+  title: string;
+  description: string | null;
+  change_type: string;
+  priority: string;
+  asset_id: string | null;
+  asset_name: string | null;
+  asset_classification: number | null;
+  justification: string | null;
+  impact_analysis: string | null;
+  rollback_plan: string | null;
+  planned_start: string | null;
+  planned_end: string | null;
+  actual_start: string | null;
+  actual_end: string | null;
+  requested_by: string | null;
+  approved_by: string | null;
+  implemented_by: string | null;
+  status: string;
+  owner_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ActivityLog = {
   id: string;
   action: string;

@@ -42,6 +42,7 @@ app.get("/", async () => ({
     "/alerts/digest (POST)",
     "/assets (GET, POST, PUT, DELETE)",
     "/incidents (GET, POST, PUT, DELETE)",
+    "/changes (GET, POST, PUT, DELETE)",
     "/activity (GET)",
   ],
 }));
@@ -842,20 +843,6 @@ app.put("/incidents/:id", async (req) => {
   return r.rows[0];
 });
 
-app.post("/incidents/:id/send-to-risk", async (req) => {
-  const { orgId, userId } = getAuth(req);
-  const { id } = req.params as { id: string };
-  const inc = await pool.query(`SELECT * FROM incidents WHERE id = $1 AND org_id = $2`, [id, orgId]);
-  if (inc.rows.length === 0) throw new Error("Not found");
-  const i = inc.rows[0];
-  const r = await pool.query(
-    `INSERT INTO risks (org_id, title, category, likelihood, impact, status, treatment_plan, owner_user_id)
-     VALUES ($1,$2,$3,3,3,'PENDING_REVIEW',$4,$5) RETURNING *`,
-    [orgId, `[From Incident] ${i.title}`, i.category ?? "Incident", `Root cause: ${i.root_cause ?? "TBD"}. Corrective action: ${i.corrective_action ?? "TBD"}`, userId]
-  );
-  await logActivity(orgId, userId, "SENT_TO_RISK", "INCIDENT", id, i.title, `Risk ID: ${r.rows[0].id}`);
-  return r.rows[0];
-});
 app.delete("/incidents/:id", async (req) => {
   const { orgId, userId, role } = getAuth(req);
   if (role === "VIEWER") throw new Error("Forbidden");
@@ -866,6 +853,115 @@ app.delete("/incidents/:id", async (req) => {
   );
   if (r.rows.length === 0) throw new Error("Not found");
   await logActivity(orgId, userId, "DELETED", "INCIDENT", id, r.rows[0].title);
+  return { deleted: true };
+});
+
+// =======================
+// Changes
+// =======================
+const ChangeSchema = z.object({
+  title: z.string().min(2).max(300),
+  description: z.string().max(5000).optional(),
+  changeType: z.enum(["STANDARD", "NORMAL", "EMERGENCY", "EXPEDITED"]).optional(),
+  priority: z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]).optional(),
+  assetId: z.string().uuid().optional(),
+  justification: z.string().max(5000).optional(),
+  impactAnalysis: z.string().max(5000).optional(),
+  rollbackPlan: z.string().max(5000).optional(),
+  plannedStart: z.string().optional(),
+  plannedEnd: z.string().optional(),
+  actualStart: z.string().optional(),
+  actualEnd: z.string().optional(),
+  requestedBy: z.string().max(200).optional(),
+  approvedBy: z.string().max(200).optional(),
+  implementedBy: z.string().max(200).optional(),
+  status: z.enum(["DRAFT", "SUBMITTED", "APPROVED", "REJECTED", "IN_PROGRESS", "COMPLETED", "ROLLED_BACK", "CANCELLED"]).optional(),
+});
+
+app.get("/changes", async (req) => {
+  const { orgId } = getAuth(req);
+  const r = await pool.query(
+    `SELECT c.*, a.name as asset_name, a.combined_classification as asset_classification FROM changes c LEFT JOIN assets a ON a.id = c.asset_id WHERE c.org_id = $1 ORDER BY c.created_at DESC LIMIT 200`,
+    [orgId]
+  );
+  return r.rows;
+});
+
+app.get("/changes/:id", async (req) => {
+  const { orgId } = getAuth(req);
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `SELECT c.*, a.name as asset_name, a.combined_classification as asset_classification FROM changes c LEFT JOIN assets a ON a.id = c.asset_id WHERE c.id = $1 AND c.org_id = $2`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  return r.rows[0];
+});
+
+app.post("/changes", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const p = ChangeSchema.parse(cleanBody(req.body));
+  const r = await pool.query(
+    `INSERT INTO changes (org_id, title, description, change_type, priority, asset_id, justification, impact_analysis, rollback_plan, planned_start, planned_end, requested_by, status, owner_user_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
+    [orgId, p.title, p.description ?? null, p.changeType ?? "STANDARD", p.priority ?? "MEDIUM",
+     p.assetId ?? null, p.justification ?? null, p.impactAnalysis ?? null, p.rollbackPlan ?? null,
+     p.plannedStart ?? null, p.plannedEnd ?? null, p.requestedBy ?? null, p.status ?? "DRAFT", userId]
+  );
+  await logActivity(orgId, userId, "CREATED", "CHANGE", r.rows[0].id, p.title, `Type: ${p.changeType ?? "STANDARD"}`);
+  return r.rows[0];
+});
+
+app.put("/changes/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const p = ChangeSchema.partial().parse(cleanBody(req.body));
+  const fields: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (p.title !== undefined) { fields.push(`title = $${idx++}`); values.push(p.title); }
+  if (p.description !== undefined) { fields.push(`description = $${idx++}`); values.push(p.description); }
+  if (p.changeType !== undefined) { fields.push(`change_type = $${idx++}`); values.push(p.changeType); }
+  if (p.priority !== undefined) { fields.push(`priority = $${idx++}`); values.push(p.priority); }
+  if (p.assetId !== undefined) { fields.push(`asset_id = $${idx++}`); values.push(p.assetId); }
+  if (p.justification !== undefined) { fields.push(`justification = $${idx++}`); values.push(p.justification); }
+  if (p.impactAnalysis !== undefined) { fields.push(`impact_analysis = $${idx++}`); values.push(p.impactAnalysis); }
+  if (p.rollbackPlan !== undefined) { fields.push(`rollback_plan = $${idx++}`); values.push(p.rollbackPlan); }
+  if (p.plannedStart !== undefined) { fields.push(`planned_start = $${idx++}`); values.push(p.plannedStart); }
+  if (p.plannedEnd !== undefined) { fields.push(`planned_end = $${idx++}`); values.push(p.plannedEnd); }
+  if (p.actualStart !== undefined) { fields.push(`actual_start = $${idx++}`); values.push(p.actualStart); }
+  if (p.actualEnd !== undefined) { fields.push(`actual_end = $${idx++}`); values.push(p.actualEnd); }
+  if (p.requestedBy !== undefined) { fields.push(`requested_by = $${idx++}`); values.push(p.requestedBy); }
+  if (p.approvedBy !== undefined) { fields.push(`approved_by = $${idx++}`); values.push(p.approvedBy); }
+  if (p.implementedBy !== undefined) { fields.push(`implemented_by = $${idx++}`); values.push(p.implementedBy); }
+  if (p.status !== undefined) { fields.push(`status = $${idx++}`); values.push(p.status); }
+
+  if (fields.length === 0) throw new Error("No fields to update");
+  fields.push(`updated_at = now()`);
+  values.push(id, orgId);
+
+  const r = await pool.query(
+    `UPDATE changes SET ${fields.join(", ")} WHERE id = $${idx++} AND org_id = $${idx} RETURNING *`,
+    values
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "UPDATED", "CHANGE", id, r.rows[0].title, `Fields: ${Object.keys(p).join(", ")}`);
+  return r.rows[0];
+});
+
+app.delete("/changes/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `DELETE FROM changes WHERE id = $1 AND org_id = $2 RETURNING *`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "DELETED", "CHANGE", id, r.rows[0].title);
   return { deleted: true };
 });
 
