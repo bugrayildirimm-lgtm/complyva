@@ -664,6 +664,103 @@ app.post("/auth/sync", async (req) => {
 });
 
 // =======================
+// Account & Team Management
+// =======================
+app.get("/account", async (req) => {
+  const { orgId, userId } = getAuth(req);
+  const orgRow = await pool.query(`SELECT id, name, created_at FROM organisations WHERE id = $1`, [orgId]);
+  const userRow = await pool.query(`SELECT id, email, full_name, created_at FROM users WHERE id = $1`, [userId]);
+  const memberCount = await pool.query(`SELECT COUNT(*)::int as count FROM memberships WHERE org_id = $1`, [orgId]);
+  return {
+    org: orgRow.rows[0] || null,
+    user: userRow.rows[0] || null,
+    memberCount: memberCount.rows[0]?.count || 0,
+  };
+});
+
+app.put("/account", async (req) => {
+  const { orgId, role } = getAuth(req);
+  if (role !== "ADMIN") throw new Error("Forbidden: ADMIN only");
+  const { name } = req.body as { name?: string };
+  if (!name?.trim()) throw new Error("Organisation name required");
+  await pool.query(`UPDATE organisations SET name = $1 WHERE id = $2`, [name.trim(), orgId]);
+  return { ok: true };
+});
+
+app.get("/account/members", async (req) => {
+  const { orgId } = getAuth(req);
+  const r = await pool.query(
+    `SELECT u.id, u.email, u.full_name, u.created_at, m.role
+     FROM memberships m JOIN users u ON u.id = m.user_id
+     WHERE m.org_id = $1
+     ORDER BY m.role ASC, u.full_name ASC`,
+    [orgId]
+  );
+  return r.rows;
+});
+
+app.put("/account/members/:memberId", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role !== "ADMIN") throw new Error("Forbidden: ADMIN only");
+  const { memberId } = req.params as { memberId: string };
+  const { role: newRole } = req.body as { role?: string };
+  if (!newRole || !["ADMIN", "AUDITOR", "VIEWER"].includes(newRole)) throw new Error("Invalid role");
+  if (memberId === userId) throw new Error("Cannot change your own role");
+  await pool.query(
+    `UPDATE memberships SET role = $1 WHERE org_id = $2 AND user_id = $3`,
+    [newRole, orgId, memberId]
+  );
+  await logActivity(orgId, userId, "ROLE_CHANGED", "USER", memberId, `Role → ${newRole}`);
+  return { ok: true };
+});
+
+app.delete("/account/members/:memberId", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role !== "ADMIN") throw new Error("Forbidden: ADMIN only");
+  const { memberId } = req.params as { memberId: string };
+  if (memberId === userId) throw new Error("Cannot remove yourself");
+  await pool.query(`DELETE FROM memberships WHERE org_id = $1 AND user_id = $2`, [orgId, memberId]);
+  await logActivity(orgId, userId, "MEMBER_REMOVED", "USER", memberId, "");
+  return { ok: true };
+});
+
+app.post("/account/invite", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role !== "ADMIN") throw new Error("Forbidden: ADMIN only");
+  const { email, role: inviteRole } = req.body as { email?: string; role?: string };
+  if (!email?.trim()) throw new Error("Email required");
+  if (!inviteRole || !["ADMIN", "AUDITOR", "VIEWER"].includes(inviteRole)) throw new Error("Invalid role");
+
+  // Check if user already exists
+  const existingUser = await pool.query(`SELECT id FROM users WHERE email = $1`, [email.trim().toLowerCase()]);
+  let targetUserId: string;
+
+  if (existingUser.rows.length > 0) {
+    targetUserId = existingUser.rows[0].id;
+    // Check if already a member
+    const existingMember = await pool.query(
+      `SELECT 1 FROM memberships WHERE org_id = $1 AND user_id = $2`, [orgId, targetUserId]
+    );
+    if (existingMember.rows.length > 0) throw new Error("User is already a member");
+  } else {
+    // Create a placeholder user — they'll get linked when they sign up via Clerk
+    const newUser = await pool.query(
+      `INSERT INTO users (email, full_name) VALUES ($1, $2) RETURNING id`,
+      [email.trim().toLowerCase(), null]
+    );
+    targetUserId = newUser.rows[0].id;
+  }
+
+  await pool.query(
+    `INSERT INTO memberships (org_id, user_id, role) VALUES ($1, $2, $3)`,
+    [orgId, targetUserId, inviteRole]
+  );
+
+  await logActivity(orgId, userId, "MEMBER_INVITED", "USER", targetUserId, `${email} as ${inviteRole}`);
+  return { ok: true };
+});
+
+// =======================
 // Evidence Files
 // =======================
 app.post("/evidence/upload", async (req) => {

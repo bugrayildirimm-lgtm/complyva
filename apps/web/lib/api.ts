@@ -677,3 +677,53 @@ export async function deleteCrossLink(id: string) {
   await apiFetch(`/cross-links/${id}`, { method: "DELETE" });
   revalidatePath("/dashboard");
 }
+
+// ========== Account & Team Management ==========
+export async function getAccount() {
+  return apiFetch("/account");
+}
+
+export async function updateAccount(data: { name: string }) {
+  "use server";
+  await apiFetch("/account", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  revalidatePath("/account");
+}
+
+export async function getMembers() {
+  return apiFetch("/account/members");
+}
+
+export async function updateMemberRole(memberId: string, role: string) {
+  "use server";
+  await apiFetch(`/account/members/${memberId}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ role }),
+  });
+  revalidatePath("/account");
+}
+
+export async function removeMember(memberId: string) {
+  "use server";
+  await apiFetch(`/account/members/${memberId}`, { method: "DELETE" });
+  revalidatePath("/account");
+}
+
+export async function inviteMember(data: { email: string; role: string }) {
+  "use server";
+  await apiFetch("/account/invite", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  revalidatePath("/account");
+}
+
+export async function getCurrentRole(): Promise<string> {
+  const dbUser = await getDbUser();
+  return dbUser.role;
+}
