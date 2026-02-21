@@ -25,7 +25,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             </SignedIn>
           </div>
         </header>
-        <div className="page-content"><ToastProvider>{children}</ToastProvider></div>
+        <div className="page-content">
+          <ToastProvider>{children}</ToastProvider>
+        </div>
       </div>
     </div>
   );

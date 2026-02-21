@@ -1,15 +1,15 @@
 "use client";
-import { ToastProvider } from "./Toast";
+
 import { createContext, useContext, useState, useCallback, useRef, type ReactNode } from "react";
 
 type ToastType = "success" | "error" | "warning" | "info";
 type Toast = { id: number; type: ToastType; message: string; leaving?: boolean };
 
 const ICONS: Record<ToastType, string> = {
-  success: "\u2705",
-  error: "\u274c",
-  warning: "\u26a0\ufe0f",
-  info: "\u2139\ufe0f",
+  success: "✅",
+  error: "❌",
+  warning: "⚠️",
+  info: "ℹ️",
 };
 
 const ToastContext = createContext<{
