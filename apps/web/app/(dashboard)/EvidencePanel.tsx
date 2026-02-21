@@ -185,7 +185,7 @@ export default function EvidencePanel({
                   >
                     Delete
                   </button>
-                )}
+                ))}
               </div>
             </div>
           ))}
