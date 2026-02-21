@@ -29,9 +29,23 @@ function scoreColor(score: number) {
   return "#22c55e";
 }
 
+// Heat map cell color based on L × I score
+function heatCellColor(likelihood: number, impact: number) {
+  const score = likelihood * impact;
+  if (score >= 20) return { bg: "#ef4444", text: "#fff" };      // Critical — red
+  if (score >= 15) return { bg: "#f97316", text: "#fff" };      // High — orange
+  if (score >= 10) return { bg: "#f59e0b", text: "#fff" };      // Medium-High — amber
+  if (score >= 5)  return { bg: "#fbbf24", text: "#111" };      // Medium — yellow
+  if (score >= 3)  return { bg: "#a3e635", text: "#111" };      // Low-Medium — lime
+  return { bg: "#4ade80", text: "#111" };                        // Low — green
+}
+
 const FREQ_LABELS: Record<number, string> = { 1: "Annual or less", 2: "Quarterly", 3: "Monthly", 4: "Weekly+" };
 const CTRL_LABELS: Record<number, string> = { 1: "Strong", 2: "Adequate", 3: "Weak", 4: "None" };
 const CTRL_COLORS: Record<number, string> = { 1: "#22c55e", 2: "#3b82f6", 3: "#f59e0b", 4: "#ef4444" };
+
+const LIKELIHOOD_LABELS = ["Rare", "Unlikely", "Possible", "Likely", "Almost Certain"];
+const IMPACT_LABELS = ["Negligible", "Minor", "Moderate", "Major", "Severe"];
 
 export default function RiskDetailClient({
   risk,
@@ -187,7 +201,7 @@ export default function RiskDetailClient({
 
       {/* Tabs */}
       <div className="card">
-        <Tabs tabs={["Details", "Scoring", "Evidence", "Activity"]}>
+        <Tabs tabs={["Details", "Scoring", "Heat Map", "Evidence", "Activity"]}>
           {/* Details Tab */}
           <div>
             <InlineEdit label="Title" name="title" value={risk.title} onSave={handleSaveField} />
@@ -282,6 +296,175 @@ export default function RiskDetailClient({
                   </div>
                 )}
               </div>
+            </div>
+          </div>
+
+          {/* Heat Map Tab */}
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "#111", marginBottom: 16 }}>
+              Risk Position — Likelihood vs Impact Matrix
+            </div>
+
+            {/* Legend */}
+            <div style={{ display: "flex", gap: 16, marginBottom: 16, fontSize: 12 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <div style={{ width: 14, height: 14, borderRadius: "50%", background: "#111", border: "3px solid #111" }} />
+                <span style={{ color: "#4b5563" }}>Inherent Risk</span>
+              </div>
+              {residualScore !== null && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 14, height: 14, borderRadius: "50%", background: "#fff", border: "3px solid #3b82f6" }} />
+                  <span style={{ color: "#4b5563" }}>Residual Risk</span>
+                </div>
+              )}
+              {residualScore !== null && (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <div style={{ width: 20, height: 2, background: "#3b82f6", position: "relative" }}>
+                    <div style={{ position: "absolute", right: -2, top: -3, width: 0, height: 0, borderLeft: "5px solid #3b82f6", borderTop: "4px solid transparent", borderBottom: "4px solid transparent" }} />
+                  </div>
+                  <span style={{ color: "#4b5563" }}>Treatment effect</span>
+                </div>
+              )}
+            </div>
+
+            {/* 5×5 Grid */}
+            <div style={{ display: "flex", gap: 0 }}>
+              {/* Y-axis label */}
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 20, marginRight: 4 }}>
+                <div style={{ transform: "rotate(-90deg)", whiteSpace: "nowrap", fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                  Impact
+                </div>
+              </div>
+
+              {/* Y-axis scale + grid */}
+              <div>
+                <div style={{ display: "flex", gap: 0 }}>
+                  {/* Y-axis values */}
+                  <div style={{ display: "flex", flexDirection: "column", gap: 0, marginRight: 4 }}>
+                    {[5, 4, 3, 2, 1].map((impact) => (
+                      <div key={impact} style={{ height: 64, display: "flex", alignItems: "center", justifyContent: "flex-end", paddingRight: 4 }}>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#4b5563" }}>{impact}</div>
+                          <div style={{ fontSize: 9, color: "#9ca3af", lineHeight: 1 }}>{IMPACT_LABELS[impact - 1]}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Grid cells */}
+                  <div>
+                    {[5, 4, 3, 2, 1].map((impact) => (
+                      <div key={impact} style={{ display: "flex", gap: 0 }}>
+                        {[1, 2, 3, 4, 5].map((likelihood) => {
+                          const cell = heatCellColor(likelihood, impact);
+                          const score = likelihood * impact;
+                          const isInherent = risk.likelihood === likelihood && risk.impact === impact;
+                          const isResidual = risk.residual_likelihood === likelihood && risk.residual_impact === impact;
+                          const isBoth = isInherent && isResidual;
+
+                          return (
+                            <div
+                              key={likelihood}
+                              style={{
+                                width: 64, height: 64,
+                                background: cell.bg,
+                                display: "flex", flexDirection: "column",
+                                alignItems: "center", justifyContent: "center",
+                                border: "1px solid rgba(255,255,255,0.3)",
+                                position: "relative",
+                                opacity: (isInherent || isResidual) ? 1 : 0.65,
+                              }}
+                            >
+                              {/* Score number */}
+                              <div style={{ fontSize: 13, fontWeight: 700, color: cell.text, opacity: 0.5 }}>
+                                {score}
+                              </div>
+
+                              {/* Inherent marker */}
+                              {isInherent && !isBoth && (
+                                <div style={{
+                                  position: "absolute", top: 4, right: 4,
+                                  width: 18, height: 18, borderRadius: "50%",
+                                  background: "#111", display: "flex", alignItems: "center", justifyContent: "center",
+                                  boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+                                }}>
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: "#fff" }}>I</span>
+                                </div>
+                              )}
+
+                              {/* Residual marker */}
+                              {isResidual && !isBoth && (
+                                <div style={{
+                                  position: "absolute", bottom: 4, left: 4,
+                                  width: 18, height: 18, borderRadius: "50%",
+                                  background: "#fff", border: "3px solid #3b82f6",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  boxShadow: "0 1px 4px rgba(0,0,0,0.2)",
+                                }}>
+                                  <span style={{ fontSize: 9, fontWeight: 700, color: "#3b82f6" }}>R</span>
+                                </div>
+                              )}
+
+                              {/* Both in same cell */}
+                              {isBoth && (
+                                <div style={{
+                                  position: "absolute", top: 4, right: 4,
+                                  width: 18, height: 18, borderRadius: "50%",
+                                  background: "#111", border: "2px solid #3b82f6",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  boxShadow: "0 1px 4px rgba(0,0,0,0.3)",
+                                }}>
+                                  <span style={{ fontSize: 8, fontWeight: 700, color: "#fff" }}>I+R</span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+
+                    {/* X-axis values */}
+                    <div style={{ display: "flex", gap: 0, marginTop: 4 }}>
+                      {[1, 2, 3, 4, 5].map((likelihood) => (
+                        <div key={likelihood} style={{ width: 64, textAlign: "center" }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#4b5563" }}>{likelihood}</div>
+                          <div style={{ fontSize: 9, color: "#9ca3af" }}>{LIKELIHOOD_LABELS[likelihood - 1]}</div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* X-axis label */}
+                    <div style={{ textAlign: "center", marginTop: 8, fontSize: 11, fontWeight: 700, color: "#6b7280", letterSpacing: "0.05em", textTransform: "uppercase" }}>
+                      Likelihood
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Score Summary underneath */}
+            <div style={{ marginTop: 24, display: "flex", gap: 24 }}>
+              <div style={{ padding: "12px 16px", background: "#f9fafb", borderRadius: 8, flex: 1 }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 4 }}>Inherent Position</div>
+                <div style={{ fontSize: 14, color: "#111" }}>
+                  Likelihood <strong>{risk.likelihood}</strong> × Impact <strong>{risk.impact}</strong> = <strong style={{ color: scoreColor(inherentScore) }}>{inherentScore}</strong>
+                  <span style={{ marginLeft: 8, fontSize: 12, color: scoreColor(inherentScore), fontWeight: 600 }}>{riskLevel(inherentScore)}</span>
+                </div>
+              </div>
+              {residualScore !== null && (
+                <div style={{ padding: "12px 16px", background: "#f9fafb", borderRadius: 8, flex: 1 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", color: "#6b7280", marginBottom: 4 }}>Residual Position</div>
+                  <div style={{ fontSize: 14, color: "#111" }}>
+                    Likelihood <strong>{risk.residual_likelihood}</strong> × Impact <strong>{risk.residual_impact}</strong> = <strong style={{ color: scoreColor(residualScore) }}>{residualScore}</strong>
+                    <span style={{ marginLeft: 8, fontSize: 12, color: scoreColor(residualScore), fontWeight: 600 }}>{riskLevel(residualScore)}</span>
+                    {residualScore < inherentScore && (
+                      <span style={{ marginLeft: 8, fontSize: 11, color: "#22c55e", fontWeight: 600 }}>
+                        ↓ {Math.round((1 - residualScore / inherentScore) * 100)}% reduction
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
