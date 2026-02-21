@@ -24,6 +24,7 @@ export default function NCDetailClient({
   activity,
   updateNC,
   deleteNC,
+  sendNCToCAPA,
   uploadEvidence,
   deleteEvidence,
 }: {
@@ -33,6 +34,7 @@ export default function NCDetailClient({
   activity: any[];
   updateNC: (id: string, data: Record<string, any>) => Promise<void>;
   deleteNC: (id: string) => Promise<void>;
+  sendNCToCAPA: (id: string) => Promise<any>;
   uploadEvidence: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
   deleteEvidence: (fileId: string) => Promise<any>;
 }) {
@@ -54,6 +56,15 @@ export default function NCDetailClient({
     router.push("/nonconformities");
   };
 
+  const handleSendToCAPA = async () => {
+    if (!confirm("Create a CAPA from this non-conformity? It will appear in the CAPA Log.")) return;
+    startTransition(async () => {
+      await sendNCToCAPA(nc.id);
+      router.refresh();
+      alert("CAPA created successfully.");
+    });
+  };
+
   const currentStepIndex = STATUS_FLOW.findIndex((s) => s.status === nc.status);
   const isOverdue = nc.due_date && nc.status !== "CLOSED" && new Date(nc.due_date) < new Date();
   const daysUntilDue = nc.due_date ? Math.ceil((new Date(nc.due_date).getTime() - Date.now()) / (1000 * 60 * 60 * 24)) : null;
@@ -70,6 +81,10 @@ export default function NCDetailClient({
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button onClick={handleSendToCAPA} disabled={isPending}
+            style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid #3b82f6", background: "#eff6ff", color: "#3b82f6", cursor: "pointer" }}>
+            → CAPA
+          </button>
           <StatusDropdown
             currentStatus={nc.status}
             options={["OPEN", "UNDER_INVESTIGATION", "CONTAINMENT", "CORRECTIVE_ACTION", "VERIFIED", "CLOSED"]}

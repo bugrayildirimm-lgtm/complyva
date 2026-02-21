@@ -1,4 +1,4 @@
-import { getNonConformity, getAssets, getEvidence, getEntityActivity, updateNonConformity, deleteNonConformity, uploadEvidence, deleteEvidence } from "../../../../lib/api";
+import { getNonConformity, getAssets, getEvidence, getEntityActivity, updateNonConformity, deleteNonConformity, sendNCToCAPA, uploadEvidence, deleteEvidence } from "../../../../lib/api";
 import type { NonConformity, Asset } from "../../../../lib/types";
 import NCDetailClient from "./NCDetailClient";
 
@@ -18,6 +18,7 @@ export default async function NCDetailPage({ params }: { params: Promise<{ id: s
       activity={activity}
       updateNC={updateNonConformity}
       deleteNC={deleteNonConformity}
+      sendNCToCAPA={sendNCToCAPA}
       uploadEvidence={uploadEvidence}
       deleteEvidence={deleteEvidence}
     />

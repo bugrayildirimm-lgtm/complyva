@@ -1,4 +1,4 @@
-import { getIncident, getAssets, getEvidence, getEntityActivity, updateIncident, deleteIncident, sendIncidentToRisk, uploadEvidence, deleteEvidence } from "../../../../lib/api";
+import { getIncident, getAssets, getEvidence, getEntityActivity, updateIncident, deleteIncident, sendIncidentToRisk, sendIncidentToNC, uploadEvidence, deleteEvidence } from "../../../../lib/api";
 import type { Incident, Asset } from "../../../../lib/types";
 import IncidentDetailClient from "./IncidentDetailClient";
 
@@ -19,6 +19,7 @@ export default async function IncidentDetailPage({ params }: { params: Promise<{
       updateIncident={updateIncident}
       deleteIncident={deleteIncident}
       sendIncidentToRisk={sendIncidentToRisk}
+      sendIncidentToNC={sendIncidentToNC}
       uploadEvidence={uploadEvidence}
       deleteEvidence={deleteEvidence}
     />

@@ -390,6 +390,30 @@ export async function sendIncidentToRisk(incidentId: string) {
   return result;
 }
 
+export async function sendIncidentToNC(incidentId: string) {
+  "use server";
+  const result = await apiFetch(`/incidents/${incidentId}/send-to-nc`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  revalidatePath("/nonconformities");
+  revalidatePath("/incidents");
+  return result;
+}
+
+export async function sendNCToCAPA(ncId: string) {
+  "use server";
+  const result = await apiFetch(`/nonconformities/${ncId}/send-to-capa`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: "{}",
+  });
+  revalidatePath("/capas");
+  revalidatePath("/nonconformities");
+  return result;
+}
+
 export async function deleteIncident(id: string) {
   "use server";
   await apiFetch(`/incidents/${id}`, { method: "DELETE" });

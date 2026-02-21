@@ -965,6 +965,67 @@ app.delete("/incidents/:id", async (req) => {
   return { deleted: true };
 });
 
+// --- Incident Cross-Register Links ---
+
+app.post("/incidents/:id/send-to-risk", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const f = await pool.query(`SELECT * FROM incidents WHERE id = $1 AND org_id = $2`, [id, orgId]);
+  if (f.rows.length === 0) throw new Error("Not found");
+  const inc = f.rows[0];
+  const sevMap: Record<string, number> = { LOW: 2, MEDIUM: 3, HIGH: 4, CRITICAL: 5 };
+  const score = sevMap[inc.severity] ?? 3;
+  const inherentScore = score * score;
+  const r = await pool.query(
+    `INSERT INTO risks (org_id, title, description, category, likelihood, impact, inherent_score, status, owner_user_id, treatment_plan)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'PENDING_REVIEW',$8,$9) RETURNING *`,
+    [orgId, `[From Incident] ${inc.title}`, inc.description || `Originated from incident: ${inc.title}`,
+     "Incident", score, score, inherentScore, userId, inc.corrective_action || null]
+  );
+  await logActivity(orgId, userId, "SENT_TO_RISK", "INCIDENT", id, inc.title, `Created Risk: ${r.rows[0].id}`);
+  return r.rows[0];
+});
+
+app.post("/incidents/:id/send-to-nc", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const f = await pool.query(`SELECT * FROM incidents WHERE id = $1 AND org_id = $2`, [id, orgId]);
+  if (f.rows.length === 0) throw new Error("Not found");
+  const inc = f.rows[0];
+  const sevMap: Record<string, string> = { LOW: "MINOR", MEDIUM: "MINOR", HIGH: "MAJOR", CRITICAL: "CRITICAL" };
+  const r = await pool.query(
+    `INSERT INTO nonconformities (org_id, title, description, source_type, source_ref_id, severity, asset_id, root_cause, raised_by, status)
+     VALUES ($1,$2,$3,'INCIDENT',$4,$5,$6,$7,$8,'OPEN') RETURNING *`,
+    [orgId, `[From Incident] ${inc.title}`, inc.description || `Originated from incident: ${inc.title}`,
+     id, sevMap[inc.severity] ?? "MINOR", inc.asset_id || null, inc.root_cause || null, inc.reported_by || null]
+  );
+  await logActivity(orgId, userId, "SENT_TO_NC", "INCIDENT", id, inc.title, `Created NC: ${r.rows[0].id}`);
+  return r.rows[0];
+});
+
+// --- NC Cross-Register Links ---
+
+app.post("/nonconformities/:id/send-to-capa", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const f = await pool.query(`SELECT * FROM nonconformities WHERE id = $1 AND org_id = $2`, [id, orgId]);
+  if (f.rows.length === 0) throw new Error("Not found");
+  const nc = f.rows[0];
+  const sevMap: Record<string, string> = { OBSERVATION: "LOW", MINOR: "MEDIUM", MAJOR: "HIGH", CRITICAL: "CRITICAL" };
+  const r = await pool.query(
+    `INSERT INTO capas (org_id, title, description, capa_type, source_type, source_ref_id, asset_id, root_cause, root_cause_category, raised_by, assigned_to, priority, status, owner_user_id)
+     VALUES ($1,$2,$3,'CORRECTIVE','NC',$4,$5,$6,$7,$8,$9,$10,'OPEN',$11) RETURNING *`,
+    [orgId, `[From NC] ${nc.title}`, nc.description || `Originated from non-conformity: ${nc.title}`,
+     id, nc.asset_id || null, nc.root_cause || null, null,
+     nc.raised_by || null, nc.assigned_to || null, sevMap[nc.severity] ?? "MEDIUM", userId]
+  );
+  await logActivity(orgId, userId, "SENT_TO_CAPA", "NC", id, nc.title, `Created CAPA: ${r.rows[0].id}`);
+  return r.rows[0];
+});
+
 // =======================
 // Changes
 // =======================

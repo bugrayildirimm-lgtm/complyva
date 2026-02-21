@@ -2,10 +2,9 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Tabs, InlineEdit, DeleteButton, StatusDropdown, SendToRiskButton } from "../../ActionComponents";
+import { Tabs, InlineEdit, DeleteButton, StatusDropdown } from "../../ActionComponents";
 import EvidencePanel from "../../EvidencePanel";
 import type { Incident, Asset } from "../../../../lib/types";
-
 
 const SEV_COLORS: Record<string, string> = {
   CRITICAL: "#ef4444", HIGH: "#f59e0b", MEDIUM: "#3b82f6", LOW: "#22c55e",
@@ -19,6 +18,7 @@ export default function IncidentDetailClient({
   updateIncident,
   deleteIncident,
   sendIncidentToRisk,
+  sendIncidentToNC,
   uploadEvidence,
   deleteEvidence,
 }: {
@@ -28,7 +28,8 @@ export default function IncidentDetailClient({
   activity: any[];
   updateIncident: (id: string, data: Record<string, any>) => Promise<void>;
   deleteIncident: (id: string) => Promise<void>;
-  sendIncidentToRisk: (incidentId: string) => Promise<any>;
+  sendIncidentToRisk: (id: string) => Promise<any>;
+  sendIncidentToNC: (id: string) => Promise<any>;
   uploadEvidence: (entityType: string, entityId: string, formData: FormData) => Promise<any>;
   deleteEvidence: (fileId: string) => Promise<any>;
 }) {
@@ -50,6 +51,24 @@ export default function IncidentDetailClient({
     router.push("/incidents");
   };
 
+  const handleSendToRisk = async () => {
+    if (!confirm("Create a new risk from this incident? It will appear in the Risk Register as PENDING REVIEW.")) return;
+    startTransition(async () => {
+      await sendIncidentToRisk(incident.id);
+      router.refresh();
+      alert("Risk created successfully.");
+    });
+  };
+
+  const handleSendToNC = async () => {
+    if (!confirm("Create a non-conformity from this incident? It will appear in the NC Register.")) return;
+    startTransition(async () => {
+      await sendIncidentToNC(incident.id);
+      router.refresh();
+      alert("Non-conformity created successfully.");
+    });
+  };
+
   const detectionDelay = incident.incident_date && incident.detected_date
     ? Math.ceil((new Date(incident.detected_date).getTime() - new Date(incident.incident_date).getTime()) / (1000 * 60 * 60 * 24))
     : null;
@@ -66,12 +85,19 @@ export default function IncidentDetailClient({
           </p>
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+          <button onClick={handleSendToRisk} disabled={isPending}
+            style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid #ef4444", background: "#fef2f2", color: "#ef4444", cursor: "pointer" }}>
+            → Risk
+          </button>
+          <button onClick={handleSendToNC} disabled={isPending}
+            style={{ padding: "6px 12px", fontSize: 12, fontWeight: 600, borderRadius: 6, border: "1px solid #8b5cf6", background: "#f5f3ff", color: "#8b5cf6", cursor: "pointer" }}>
+            → NC
+          </button>
           <StatusDropdown
             currentStatus={incident.status}
             options={["OPEN", "INVESTIGATING", "CONTAINED", "RESOLVED", "CLOSED"]}
             onStatusChange={handleStatusChange}
           />
-          <SendToRiskButton onSend={async () => { await sendIncidentToRisk(incident.id); }} />
           <DeleteButton onDelete={handleDelete} />
         </div>
       </div>
