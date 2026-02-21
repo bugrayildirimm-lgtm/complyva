@@ -53,6 +53,7 @@ export default function CAPADetailClient({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const canEdit = role !== "VIEWER";
 
   const handleSaveField = async (name: string, value: string) => {
     await updateCAPA(capa.id, { [name]: value });

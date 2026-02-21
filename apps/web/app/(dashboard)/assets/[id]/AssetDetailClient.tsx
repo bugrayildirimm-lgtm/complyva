@@ -32,6 +32,7 @@ export default function AssetDetailClient({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const canEdit = role !== "VIEWER";
 
   const handleSaveField = async (name: string, value: string) => {
     const numericFields = ["biaScore", "dcaScore"];

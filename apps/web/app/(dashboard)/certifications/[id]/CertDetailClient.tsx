@@ -33,6 +33,7 @@ export default function CertDetailClient({
 }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const canEdit = role !== "VIEWER";
 
   const handleSaveField = async (name: string, value: string) => {
     await updateCertification(cert.id, { [name]: value });
