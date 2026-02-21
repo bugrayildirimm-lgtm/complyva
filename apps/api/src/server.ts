@@ -43,6 +43,7 @@ app.get("/", async () => ({
     "/assets (GET, POST, PUT, DELETE)",
     "/incidents (GET, POST, PUT, DELETE)",
     "/changes (GET, POST, PUT, DELETE)",
+    "/nonconformities (GET, POST, PUT, DELETE)",
     "/activity (GET)",
   ],
 }));
@@ -962,6 +963,112 @@ app.delete("/changes/:id", async (req) => {
   );
   if (r.rows.length === 0) throw new Error("Not found");
   await logActivity(orgId, userId, "DELETED", "CHANGE", id, r.rows[0].title);
+  return { deleted: true };
+});
+
+// =======================
+// Non-Conformities
+// =======================
+const NCSchema = z.object({
+  title: z.string().min(2).max(300),
+  description: z.string().max(5000).optional(),
+  sourceType: z.enum(["AUDIT", "INCIDENT", "CUSTOMER_COMPLAINT", "INTERNAL", "REGULATORY", "SUPPLIER"]).optional(),
+  sourceRefId: z.string().uuid().optional(),
+  category: z.string().max(100).optional(),
+  severity: z.enum(["OBSERVATION", "MINOR", "MAJOR", "CRITICAL"]).optional(),
+  assetId: z.string().uuid().optional(),
+  rootCause: z.string().max(5000).optional(),
+  containmentAction: z.string().max(5000).optional(),
+  raisedBy: z.string().max(200).optional(),
+  assignedTo: z.string().max(200).optional(),
+  dueDate: z.string().optional(),
+  closedDate: z.string().optional(),
+  status: z.enum(["OPEN", "UNDER_INVESTIGATION", "CONTAINMENT", "CORRECTIVE_ACTION", "VERIFIED", "CLOSED"]).optional(),
+});
+
+app.get("/nonconformities", async (req) => {
+  const { orgId } = getAuth(req);
+  const r = await pool.query(
+    `SELECT n.*, a.name as asset_name FROM nonconformities n LEFT JOIN assets a ON a.id = n.asset_id WHERE n.org_id = $1 ORDER BY n.created_at DESC LIMIT 200`,
+    [orgId]
+  );
+  return r.rows;
+});
+
+app.get("/nonconformities/:id", async (req) => {
+  const { orgId } = getAuth(req);
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `SELECT n.*, a.name as asset_name FROM nonconformities n LEFT JOIN assets a ON a.id = n.asset_id WHERE n.id = $1 AND n.org_id = $2`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  return r.rows[0];
+});
+
+app.post("/nonconformities", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const p = NCSchema.parse(cleanBody(req.body));
+  const r = await pool.query(
+    `INSERT INTO nonconformities (org_id, title, description, source_type, source_ref_id, category, severity, asset_id, root_cause, containment_action, raised_by, assigned_to, due_date, status, owner_user_id)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
+    [orgId, p.title, p.description ?? null, p.sourceType ?? "INTERNAL", p.sourceRefId ?? null,
+     p.category ?? null, p.severity ?? "MINOR", p.assetId ?? null,
+     p.rootCause ?? null, p.containmentAction ?? null,
+     p.raisedBy ?? null, p.assignedTo ?? null, p.dueDate ?? null, p.status ?? "OPEN", userId]
+  );
+  await logActivity(orgId, userId, "CREATED", "NC", r.rows[0].id, p.title, `Severity: ${p.severity ?? "MINOR"}`);
+  return r.rows[0];
+});
+
+app.put("/nonconformities/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const p = NCSchema.partial().parse(cleanBody(req.body));
+  const fields: string[] = [];
+  const values: any[] = [];
+  let idx = 1;
+
+  if (p.title !== undefined) { fields.push(`title = $${idx++}`); values.push(p.title); }
+  if (p.description !== undefined) { fields.push(`description = $${idx++}`); values.push(p.description); }
+  if (p.sourceType !== undefined) { fields.push(`source_type = $${idx++}`); values.push(p.sourceType); }
+  if (p.sourceRefId !== undefined) { fields.push(`source_ref_id = $${idx++}`); values.push(p.sourceRefId); }
+  if (p.category !== undefined) { fields.push(`category = $${idx++}`); values.push(p.category); }
+  if (p.severity !== undefined) { fields.push(`severity = $${idx++}`); values.push(p.severity); }
+  if (p.assetId !== undefined) { fields.push(`asset_id = $${idx++}`); values.push(p.assetId); }
+  if (p.rootCause !== undefined) { fields.push(`root_cause = $${idx++}`); values.push(p.rootCause); }
+  if (p.containmentAction !== undefined) { fields.push(`containment_action = $${idx++}`); values.push(p.containmentAction); }
+  if (p.raisedBy !== undefined) { fields.push(`raised_by = $${idx++}`); values.push(p.raisedBy); }
+  if (p.assignedTo !== undefined) { fields.push(`assigned_to = $${idx++}`); values.push(p.assignedTo); }
+  if (p.dueDate !== undefined) { fields.push(`due_date = $${idx++}`); values.push(p.dueDate); }
+  if (p.closedDate !== undefined) { fields.push(`closed_date = $${idx++}`); values.push(p.closedDate); }
+  if (p.status !== undefined) { fields.push(`status = $${idx++}`); values.push(p.status); }
+
+  if (fields.length === 0) throw new Error("No fields to update");
+  fields.push(`updated_at = now()`);
+  values.push(id, orgId);
+
+  const r = await pool.query(
+    `UPDATE nonconformities SET ${fields.join(", ")} WHERE id = $${idx++} AND org_id = $${idx} RETURNING *`,
+    values
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "UPDATED", "NC", id, r.rows[0].title, `Fields: ${Object.keys(p).join(", ")}`);
+  return r.rows[0];
+});
+
+app.delete("/nonconformities/:id", async (req) => {
+  const { orgId, userId, role } = getAuth(req);
+  if (role === "VIEWER") throw new Error("Forbidden");
+  const { id } = req.params as { id: string };
+  const r = await pool.query(
+    `DELETE FROM nonconformities WHERE id = $1 AND org_id = $2 RETURNING *`,
+    [id, orgId]
+  );
+  if (r.rows.length === 0) throw new Error("Not found");
+  await logActivity(orgId, userId, "DELETED", "NC", id, r.rows[0].title);
   return { deleted: true };
 });
 

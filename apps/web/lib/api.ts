@@ -373,17 +373,6 @@ export async function updateIncident(id: string, data: Record<string, any>) {
   revalidatePath("/dashboard");
 }
 
-export async function sendIncidentToRisk(incidentId: string) {
-  "use server";
-  const result = await apiFetch(`/incidents/${incidentId}/send-to-risk`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: "{}",
-  });
-  revalidatePath("/risks");
-  revalidatePath("/incidents");
-  return result;
-}
 export async function deleteIncident(id: string) {
   "use server";
   await apiFetch(`/incidents/${id}`, { method: "DELETE" });
@@ -441,6 +430,59 @@ export async function deleteChange(id: string) {
   "use server";
   await apiFetch(`/changes/${id}`, { method: "DELETE" });
   revalidatePath("/changes");
+  revalidatePath("/dashboard");
+}
+
+// ========== Non-Conformities ==========
+export async function getNonConformities() {
+  return apiFetch("/nonconformities");
+}
+
+export async function getNonConformity(id: string) {
+  return apiFetch(`/nonconformities/${id}`);
+}
+
+export async function createNonConformity(formData: FormData) {
+  "use server";
+  const title = String(formData.get("title") ?? "").trim();
+  if (title.length < 2) { redirect("/nonconformities"); return; }
+
+  await apiFetch("/nonconformities", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      title,
+      description: str(formData, "description"),
+      sourceType: String(formData.get("sourceType") ?? "INTERNAL"),
+      category: str(formData, "category"),
+      severity: String(formData.get("severity") ?? "MINOR"),
+      assetId: str(formData, "assetId") || undefined,
+      raisedBy: str(formData, "raisedBy"),
+      assignedTo: str(formData, "assignedTo"),
+      dueDate: str(formData, "dueDate"),
+    }),
+  });
+
+  revalidatePath("/nonconformities");
+  revalidatePath("/dashboard");
+}
+
+export async function updateNonConformity(id: string, data: Record<string, any>) {
+  "use server";
+  await apiFetch(`/nonconformities/${id}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  revalidatePath(`/nonconformities/${id}`);
+  revalidatePath("/nonconformities");
+  revalidatePath("/dashboard");
+}
+
+export async function deleteNonConformity(id: string) {
+  "use server";
+  await apiFetch(`/nonconformities/${id}`, { method: "DELETE" });
+  revalidatePath("/nonconformities");
   revalidatePath("/dashboard");
 }
 

@@ -138,6 +138,29 @@ export type Change = {
   updated_at: string;
 };
 
+export type NonConformity = {
+  id: string;
+  org_id: string;
+  title: string;
+  description: string | null;
+  source_type: string;
+  source_ref_id: string | null;
+  category: string | null;
+  severity: string;
+  asset_id: string | null;
+  asset_name: string | null;
+  root_cause: string | null;
+  containment_action: string | null;
+  raised_by: string | null;
+  assigned_to: string | null;
+  due_date: string | null;
+  closed_date: string | null;
+  status: string;
+  owner_user_id: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type ActivityLog = {
   id: string;
   action: string;
