@@ -262,7 +262,22 @@ export default function AccountClient({
               </button>
             </div>
             <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 8 }}>
-              The user will be added to your organisation. If they don&apos;t have an account yet, they&apos;ll be linked when they sign up with this email.
+              The user will be added to your organisation with the selected role. Share your Complyva sign-up link with them — when they register with this email address, they&apos;ll automatically join your organisation. Their status will show as &quot;Pending Invite&quot; until they sign up.
+            </div>
+            <div style={{ marginTop: 8 }}>
+              <button
+                onClick={() => {
+                  const url = `${window.location.origin}/sign-up`;
+                  navigator.clipboard.writeText(url);
+                  toast.success("Sign-up link copied!");
+                }}
+                style={{
+                  padding: "4px 12px", fontSize: 11, fontWeight: 600, borderRadius: 6,
+                  border: "1px solid #d1d5db", background: "#fff", color: "#374151", cursor: "pointer",
+                }}
+              >
+                📋 Copy Sign-Up Link
+              </button>
             </div>
           </div>
         )}
@@ -287,6 +302,14 @@ export default function AccountClient({
                       <div style={{ fontSize: 13, fontWeight: 550, color: "#111" }}>
                         {m.full_name || "—"}
                         {isMe && <span style={{ fontSize: 10, color: "#9ca3af", marginLeft: 6 }}>(you)</span>}
+                        {m.status === "PENDING" && (
+                          <span style={{
+                            fontSize: 9, fontWeight: 700, color: "#f59e0b", background: "#fffbeb",
+                            border: "1px solid #fde68a", borderRadius: 10, padding: "1px 7px", marginLeft: 6,
+                          }}>
+                            PENDING INVITE
+                          </span>
+                        )}
                       </div>
                       <div style={{ fontSize: 12, color: "#6b7280" }}>{m.email}</div>
                     </td>

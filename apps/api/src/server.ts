@@ -631,6 +631,7 @@ app.post("/auth/sync", async (req) => {
 
   if (!clerkUserId || !email) throw new Error("Missing clerk user info");
 
+  // 1. Check if this Clerk user already has an account (returning user)
   const existing = await pool.query(
     `SELECT u.id as user_id, m.org_id, m.role
      FROM users u JOIN memberships m ON m.user_id = u.id
@@ -642,6 +643,26 @@ app.post("/auth/sync", async (req) => {
     return { userId: existing.rows[0].user_id, orgId: existing.rows[0].org_id, role: existing.rows[0].role };
   }
 
+  // 2. Check if this email was invited (has a user record + membership but no cognito_sub)
+  const invited = await pool.query(
+    `SELECT u.id as user_id, m.org_id, m.role
+     FROM users u JOIN memberships m ON m.user_id = u.id
+     WHERE LOWER(u.email) = LOWER($1) AND (u.cognito_sub IS NULL OR u.cognito_sub = '')
+     LIMIT 1`,
+    [email]
+  );
+
+  if (invited.rows.length > 0) {
+    // Link this Clerk account to the invited user record
+    await pool.query(
+      `UPDATE users SET cognito_sub = $1, full_name = COALESCE(NULLIF($2, ''), full_name) WHERE id = $3`,
+      [clerkUserId, fullName || null, invited.rows[0].user_id]
+    );
+    await logActivity(invited.rows[0].org_id, invited.rows[0].user_id, "JOINED_VIA_INVITE", "USER", invited.rows[0].user_id, fullName || email);
+    return { userId: invited.rows[0].user_id, orgId: invited.rows[0].org_id, role: invited.rows[0].role };
+  }
+
+  // 3. Brand new user — create org + user + membership
   const orgResult = await pool.query(
     `INSERT INTO organisations (name) VALUES ($1) RETURNING id`,
     [`${fullName || email}'s Organisation`]
@@ -690,7 +711,8 @@ app.put("/account", async (req) => {
 app.get("/account/members", async (req) => {
   const { orgId } = getAuth(req);
   const r = await pool.query(
-    `SELECT u.id, u.email, u.full_name, u.created_at, m.role
+    `SELECT u.id, u.email, u.full_name, u.created_at, m.role,
+            CASE WHEN u.cognito_sub IS NULL OR u.cognito_sub = '' THEN 'PENDING' ELSE 'ACTIVE' END as status
      FROM memberships m JOIN users u ON u.id = m.user_id
      WHERE m.org_id = $1
      ORDER BY m.role ASC, u.full_name ASC`,
