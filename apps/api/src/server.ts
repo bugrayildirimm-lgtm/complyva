@@ -643,23 +643,43 @@ app.post("/auth/sync", async (req) => {
     return { userId: existing.rows[0].user_id, orgId: existing.rows[0].org_id, role: existing.rows[0].role };
   }
 
-  // 2. Check if this email was invited (has a user record + membership but no cognito_sub)
-  const invited = await pool.query(
+  // 2. Check if this email already exists in the DB (invited or leftover from previous attempt)
+  const existingByEmail = await pool.query(
     `SELECT u.id as user_id, m.org_id, m.role
-     FROM users u JOIN memberships m ON m.user_id = u.id
-     WHERE LOWER(u.email) = LOWER($1) AND (u.cognito_sub IS NULL OR u.cognito_sub = '')
+     FROM users u LEFT JOIN memberships m ON m.user_id = u.id
+     WHERE LOWER(u.email) = LOWER($1)
      LIMIT 1`,
     [email]
   );
 
-  if (invited.rows.length > 0) {
-    // Link this Clerk account to the invited user record
+  if (existingByEmail.rows.length > 0 && existingByEmail.rows[0].org_id) {
+    // User record exists with a membership — link Clerk account and return
     await pool.query(
       `UPDATE users SET cognito_sub = $1, full_name = COALESCE(NULLIF($2, ''), full_name) WHERE id = $3`,
-      [clerkUserId, fullName || null, invited.rows[0].user_id]
+      [clerkUserId, fullName || null, existingByEmail.rows[0].user_id]
     );
-    await logActivity(invited.rows[0].org_id, invited.rows[0].user_id, "JOINED_VIA_INVITE", "USER", invited.rows[0].user_id, fullName || email);
-    return { userId: invited.rows[0].user_id, orgId: invited.rows[0].org_id, role: invited.rows[0].role };
+    await logActivity(existingByEmail.rows[0].org_id, existingByEmail.rows[0].user_id, "JOINED_VIA_INVITE", "USER", existingByEmail.rows[0].user_id, fullName || email);
+    return { userId: existingByEmail.rows[0].user_id, orgId: existingByEmail.rows[0].org_id, role: existingByEmail.rows[0].role };
+  }
+
+  if (existingByEmail.rows.length > 0 && !existingByEmail.rows[0].org_id) {
+    // User record exists but has no membership (orphaned) — update and create fresh org
+    const userId = existingByEmail.rows[0].user_id;
+    await pool.query(
+      `UPDATE users SET cognito_sub = $1, full_name = COALESCE(NULLIF($2, ''), full_name) WHERE id = $3`,
+      [clerkUserId, fullName || null, userId]
+    );
+    const orgResult = await pool.query(
+      `INSERT INTO organisations (name) VALUES ($1) RETURNING id`,
+      [`${fullName || email}'s Organisation`]
+    );
+    const orgId = orgResult.rows[0].id;
+    await pool.query(
+      `INSERT INTO memberships (org_id, user_id, role) VALUES ($1, $2, 'ADMIN')`,
+      [orgId, userId]
+    );
+    await logActivity(orgId, userId, "SIGNED_UP", "USER", userId, fullName || email);
+    return { userId, orgId, role: "ADMIN" };
   }
 
   // 3. Brand new user — create org + user + membership
