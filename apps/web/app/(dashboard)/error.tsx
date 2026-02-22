@@ -34,6 +34,9 @@ export default function DashboardError({
           ? "We couldn't verify your account. Please sign out and sign back in."
           : "An unexpected error occurred. Please try again."}
       </p>
+      <p style={{ fontSize: 11, color: "#9ca3af", maxWidth: 500, marginBottom: 16, wordBreak: "break-all" }}>
+        {error.message}
+      </p>
       <div style={{ display: "flex", gap: 10 }}>
         <button
           onClick={reset}

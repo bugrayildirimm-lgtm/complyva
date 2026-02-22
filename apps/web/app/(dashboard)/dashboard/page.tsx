@@ -43,10 +43,17 @@ const ENTITY_PATHS: Record<string, string> = {
 };
 
 export default async function DashboardPage() {
-  const [s, e] = await Promise.all([
-    getSummary(),
-    getEnhancedDashboard().catch(() => null) as Promise<DashboardEnhanced | null>,
-  ]);
+  let s: any;
+  let e: DashboardEnhanced | null = null;
+  
+  try {
+    [s, e] = await Promise.all([
+      getSummary(),
+      getEnhancedDashboard().catch(() => null) as Promise<DashboardEnhanced | null>,
+    ]);
+  } catch (err: any) {
+    throw new Error(`Dashboard load failed: ${err.message}`);
+  }
 
   // Collect alerts
   const alerts: { level: "red" | "amber" | "blue"; message: string; link: string }[] = [];
