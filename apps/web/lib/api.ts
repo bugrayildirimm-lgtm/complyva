@@ -22,21 +22,32 @@ function num(formData: FormData, name: string, fallback: number) {
 async function getDbUser() {
   const { userId: clerkUserId } = await auth();
   const user = await currentUser();
-  if (!user) throw new Error("Not signed in");
+  if (!user || !clerkUserId) throw new Error("Not signed in");
 
-  const res = await fetch(`${API_BASE}/auth/sync`, {
-    method: "POST",
-    headers: {
-      "x-clerk-user-id": clerkUserId!,
-      "x-clerk-email": user.emailAddresses[0]?.emailAddress ?? "",
-      "x-clerk-name": `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim(),
-    },
-    body: "{}",
-  });
+  const emailAddr = user.emailAddresses[0]?.emailAddress ?? "";
+  const fullName = `${user.firstName ?? ""} ${user.lastName ?? ""}`.trim();
 
-  const data = await res.json();
-  if (!res.ok) throw new Error(data?.error ?? "Sync failed");
-  return data as { userId: string; orgId: string; role: string };
+  if (!emailAddr) throw new Error("No email address found");
+
+  try {
+    const res = await fetch(`${API_BASE}/auth/sync`, {
+      method: "POST",
+      headers: {
+        "x-clerk-user-id": clerkUserId,
+        "x-clerk-email": emailAddr,
+        "x-clerk-name": fullName,
+        "Content-Type": "application/json",
+      },
+      body: "{}",
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data?.error ?? `Sync failed: HTTP ${res.status}`);
+    return data as { userId: string; orgId: string; role: string };
+  } catch (err: any) {
+    console.error("[getDbUser] Auth sync failed:", err.message);
+    throw err;
+  }
 }
 
 // --- Generic fetch ---
